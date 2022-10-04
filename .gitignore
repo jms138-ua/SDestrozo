@@ -1,0 +1,6 @@
+project/
+build/
+
+#Python stuff
+__pycache__
+Pipfile.lock
