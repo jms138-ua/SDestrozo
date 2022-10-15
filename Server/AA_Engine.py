@@ -14,7 +14,6 @@ from random import randrange
 SIZE_MAP = 20
 SIZE_CITY = SIZE_MAP / 2
 
-# si le das direction.S se va al norte y no al sur, ps F
 class Direction():
     N = (0,-1)
     S = (0,1)
@@ -85,8 +84,8 @@ class Map():
         for i in range(SIZE_MAP):
             rowList = []
             for j in range(SIZE_MAP):
-                # count = randrange(20) # de 0 a 19
-                count = count + 1
+                count = randrange(20) # de 0 a 19
+                #count = count + 1
                 if count < 8:
                     bombs = bombs + 1
                     value = Cell.MINA
@@ -96,8 +95,8 @@ class Map():
                 elif count > 10:
                     value = Cell.NADA
 
-                rowList.append(count)
-                #rowList.append(value)
+                #rowList.append(count)
+                rowList.append(value)
             map.append(rowList)
         return map
 
