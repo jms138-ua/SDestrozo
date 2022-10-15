@@ -124,10 +124,16 @@ class Map():
     def move(self, fromcell, direc):
         tocell = fromcell + direc
         status = self.checkCell(tocell)
-        # si es nada solo se mueve, si es alimento se mueve y sube nivel
-        # si es mina se mueve y desparece la mina y el jugador
-        self.setCell(fromcell.getRow(), fromcell.getColumn(), Cell.NADA)
-        self.setCell(tocell.getRow(), tocell.getColumn(), Cell.JUGADOR)
+
+        if status == Cell.NADA or status == Cell.ALIMENTO or status == Cell.MINA:
+            self.setCell(fromcell.getRow(), fromcell.getColumn(), Cell.NADA)
+            if status == Cell.NADA:
+                self.setCell(tocell.getRow(), tocell.getColumn(), Cell.JUGADOR)
+            elif status == Cell.ALIMENTO:
+                # tu pokémon ha subido de nivel
+                self.setCell(tocell.getRow(), tocell.getColumn(), Cell.JUGADOR)
+            elif status == Cell.MINA:
+                self.setCell(tocell.getRow(), tocell.getColumn(), Cell.NADA)
 
         return status, tocell
 
