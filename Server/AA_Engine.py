@@ -18,8 +18,8 @@ class Cell():
     EMPTY = " "
 
     def __init__(self, column, row):
-        self.column = column
         self.row = row
+        self.column = column
 
     def __str__(self):
         return "({x},{y})".format(x=self.getColumn(), y=self.getRow())
@@ -36,6 +36,9 @@ class Cell():
     def getRow(self):
         return self.row
 
+    def normalize(self, columnsize, rowsize):
+        self.row = self.getRow() % rowsize
+        self.column = self.getColumn() % columnsize
 
 class Map():
     SIZE = 20
@@ -59,9 +62,6 @@ class Map():
             strmap += "\n"
         return strmap
 
-    def getSize():
-        return Map.SIZE
-
     def getMap(self):
         return self.map
 
@@ -73,7 +73,7 @@ class Map():
 
     def newRandMap(self):
         map = []
-        for _ in range(Map.getSize()):
+        for _ in range(Map.SIZE):
             row = []
             for value, weight in Map.RAND_ROW_VALUES_PERCENTAGE:
                 row.extend([value]*weight)
@@ -95,6 +95,8 @@ class Game():
     #def move(self, player, direc):
     def move(self, alias, fromcell, direc):
         tocell = fromcell + direc
+        tocell.normalize(Map.SIZE, Map.SIZE)
+        print(tocell)
         status = self.checkPosition(tocell)
 
         if status == Cell.EMPTY or status == Cell.FOOD or status == Cell.MINE:
@@ -113,7 +115,7 @@ class Game():
         flag = False
         it = 0
         #comprobar qué hay en cada posición
-        for i in range(Map.getSize()):
+        for i in range(Map.SIZE):
             for row in self.map.map:
                 if flag == True:
                     break
@@ -137,7 +139,7 @@ class Game():
 #Local test
 if __name__ == "__main__":
     game = Game()
-    game.newPlayer("J", 4,3)
+    game.newPlayer("J", 4,19)
     print(game)
-    game.move("J", Cell(4,3), Direction.S)
+    game.move("J", Cell(4,19), Direction.S)
     print(game)
