@@ -13,14 +13,13 @@ class Direction():
 
 
 class Cell():
-    JUGADOR = "J"
-    MINA = "M"
-    ALIMENTO = "A"
-    NADA = " "
+    MINE = "M"
+    FOOD= "A"
+    EMPTY = " "
 
-    def __init__(self, c, r):
-        self.column = c
-        self.row = r
+    def __init__(self, column, row):
+        self.column = column
+        self.row = row
 
     def __str__(self):
         return "({x},{y})".format(x=self.getColumn(), y=self.getRow())
@@ -31,26 +30,31 @@ class Cell():
     def __add__(self, direc):
         return Cell(self.getColumn()+direc[0], self.getRow()+direc[1])
 
-    def getColumn (self):
+    def getColumn(self):
         return self.column
 
-    def getRow (self):
+    def getRow(self):
         return self.row
 
 
 class Map():
     SIZE = 20
     SIZE_CITY = SIZE/2
+    RAND_ROW_VALUES_PERCENTAGE = [
+        (Cell.EMPTY, 15),
+        (Cell.MINE, 3),
+        (Cell.FOOD, 2)
+    ]
 
     def __init__(self):
         self.map = self.newRandMap()
 
     def __str__(self):
         strmap = ""
-        for y in range(Map.SIZE):
+        for j, row in enumerate(self.map):
             strmap += "|"
-            for x in range(Map.SIZE):
-                strmap += self.getCell(x,y)
+            for i, value in enumerate(row):
+                strmap += value
                 strmap += "|"
             strmap += "\n"
         return strmap
@@ -58,36 +62,23 @@ class Map():
     def getSize():
         return Map.SIZE
 
-    def getCell(self, x, y):
-        return self.map[y][x]
+    def getMap(self):
+        return self.map
 
-    def setCell(self, x, y, value):
-        self.map[y][x] = value
+    def getCell(self, i, j):
+        return self.map[j][i]
+
+    def setCell(self, i, j, value):
+        self.map[j][i] = value
 
     def newRandMap(self):
-        # TODO: El número de alimentos no debe ser divisible entre el número
-        # de jugadores para evitar un empate, mucho menos número par
-        bombs = food = players = value = zeroes =  0
         map = []
-        count = 0
-
-        for i in range(Map.getSize()):
-            rowList = []
-            for j in range(Map.getSize()):
-                count = random.randrange(20) # de 0 a 19
-                #count = count + 1
-                if count < 8:
-                    bombs = bombs + 1
-                    value = Cell.MINA
-                elif count >= 8 and count <= 10:
-                    food = food + 1
-                    value = Cell.ALIMENTO
-                elif count > 10:
-                    value = Cell.NADA
-
-                #rowList.append(count)
-                rowList.append(value)
-            map.append(rowList)
+        for _ in range(Map.getSize()):
+            row = []
+            for value, weight in Map.RAND_ROW_VALUES_PERCENTAGE:
+                row.extend([value]*weight)
+            random.shuffle(row)
+            map.append(row)
         return map
 
 
@@ -106,15 +97,15 @@ class Game():
         tocell = fromcell + direc
         status = self.checkPosition(tocell)
 
-        if status == Cell.NADA or status == Cell.ALIMENTO or status == Cell.MINA:
-            self.map.setCell(fromcell.getColumn(), fromcell.getRow(), Cell.NADA)
-            if status == Cell.NADA:
+        if status == Cell.EMPTY or status == Cell.FOOD or status == Cell.MINE:
+            self.map.setCell(fromcell.getColumn(), fromcell.getRow(), Cell.EMPTY)
+            if status == Cell.EMPTY:
                 self.map.setCell(fromcell.getColumn(), tocell.getRow(), alias)
-            elif status == Cell.ALIMENTO:
+            elif status == Cell.FOOD:
                 # tu pokémon ha subido de nivel
                 self.map.setCell(fromcell.getColumn(), tocell.getRow(), alias)
-            elif status == Cell.MINA:
-                self.map.setCell(fromcell.getColumn(), tocell.getRow(), Cell.NADA)
+            elif status == Cell.MINE:
+                self.map.setCell(fromcell.getColumn(), tocell.getRow(), Cell.EMPTY)
 
         return status, tocell
 
