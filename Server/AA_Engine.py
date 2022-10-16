@@ -1,5 +1,5 @@
 import random
-
+import AA_Registry
 
 class Direction():
     N = (0,-1)
@@ -62,6 +62,9 @@ class Map():
             strmap += "\n"
         return strmap
 
+    def getMap(self):
+        return self.map
+
     def getCell(self, i, j):
         return self.map[j][i]
 
@@ -86,19 +89,15 @@ class Game():
     def __str__(self):
         return str(self.map)
 
-    def newPlayer(self, alias):
-        while True:
-            i = random.randint(0,Map.SIZE)
-            j = random.randint(0,Map.SIZE)
-            if self.map.getCell(i,j) == Cell.EMPTY:
-                self.map.setCell(i, j, alias)
-                break
+    def newPlayer(self, alias, x, y):
+        self.map.setCell(x, y, alias)
 
     #def move(self, player, direc):
     def move(self, alias, fromcell, direc):
         tocell = fromcell + direc
         tocell.normalize(Map.SIZE, Map.SIZE)
         print(tocell)
+        city = self.checkCity(fromcell, tocell)
         status = self.checkPosition(tocell)
 
         if status == Cell.EMPTY or status == Cell.FOOD or status == Cell.MINE:
@@ -137,11 +136,33 @@ class Game():
     def update(self, cell, status):
         pass
 
+    def checkCity(self, fromcell, tocell):
+        city = 0
+
+        if tocell.getRow() <= Map.SIZE_CITY and tocell.getColumn() <= Map.SIZE_CITY:
+            if fromcell.getRow() > Map.SIZE_CITY or fromcell.getColumn() > Map.SIZE_CITY:
+                print("Cambio a ciudad 1")
+                city = 1
+        elif tocell.getRow() <= Map.SIZE_CITY and tocell.getColumn() > Map.SIZE_CITY:
+            if fromcell.getRow() > Map.SIZE_CITY or fromcell.getColumn() <= Map.SIZE_CITY:
+                print("Cambio a ciudad 2")
+                city = 2
+        elif tocell.getRow() > Map.SIZE_CITY and tocell.getColumn() <= Map.SIZE_CITY:
+            if fromcell.getRow() <= Map.SIZE_CITY or fromcell.getColumn() > Map.SIZE_CITY:
+                print("Cambio a ciudad 3")
+                city = 3
+        elif tocell.getRow() > Map.SIZE_CITY and tocell.getColumn() > Map.SIZE_CITY:
+            if fromcell.getRow() <= Map.SIZE_CITY or fromcell.getColumn() <= Map.SIZE_CITY:
+                print("Cambio a ciudad 4")
+                city = 4
+        # si city = 0 significa que no cambia de ciudad
+        return city
 
 #Local test
 if __name__ == "__main__":
     game = Game()
-    game.newPlayer("J")
+    game.newPlayer("J", 4,19)
     print(game)
     game.move("J", Cell(4,19), Direction.S)
     print(game)
+
