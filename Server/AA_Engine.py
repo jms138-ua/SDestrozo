@@ -1,18 +1,5 @@
-'''
-- ARGS:
-    - Puerto de escucha
-    - Maximo numero de jugadores
-    - Puerto AA_Weather
-- RETURNS:
-    - Tablero
-- DO:
-    - 4 peticiones a AA_Weather
-'''
+import random
 
-from random import randrange
-
-SIZE_MAP = 20
-SIZE_CITY = SIZE_MAP / 2
 
 class Direction():
     N = (0,-1)
@@ -24,49 +11,52 @@ class Direction():
     SW = (-1,1)
     SE = (1,1)
 
+
 class Cell():
     JUGADOR = "J"
     MINA = "M"
     ALIMENTO = "A"
     NADA = " "
 
-    def __init__(self, r, c):
-        self.row = r
+    def __init__(self, c, r):
         self.column = c
+        self.row = r
 
     def __str__(self):
-        return "(" + str(self.getRow()) + ", " + str(self.getColumn()) + ")"
+        return "({x},{y})".format(x=self.getColumn(), y=self.getRow())
 
     def __eq__(self, other):
         return self.getColumn() == other.getColumn() and self.getRow() == other.getRow()
 
     def __add__(self, direc):
-        return Cell(self.getRow()+direc[0], self.getColumn()+direc[1])
-
-    def getRow (self):
-        return self.row
+        return Cell(self.getColumn()+direc[0], self.getRow()+direc[1])
 
     def getColumn (self):
         return self.column
 
+    def getRow (self):
+        return self.row
+
 
 class Map():
+    SIZE = 20
+    SIZE_CITY = SIZE/2
+
     def __init__(self):
-        self.map = self.newMap()
-        self.height = self.width = SIZE_MAP
+        self.map = self.newRandMap()
 
     def __str__(self):
         strmap = ""
-        for i in range(SIZE_MAP):
-            strmap += str(self.map[i])
+        for y in range(Map.SIZE):
+            strmap += "|"
+            for x in range(Map.SIZE):
+                strmap += self.getCell(x,y)
+                strmap += "|"
             strmap += "\n"
         return strmap
 
-    def getHeight(self):
-        return self.height
-
-    def getWidth(self):
-        return self.width
+    def getSize():
+        return Map.SIZE
 
     def getCell(self, x, y):
         return self.map[y][x]
@@ -74,17 +64,17 @@ class Map():
     def setCell(self, x, y, value):
         self.map[y][x] = value
 
-    def newMap(self):
+    def newRandMap(self):
         # TODO: El número de alimentos no debe ser divisible entre el número
         # de jugadores para evitar un empate, mucho menos número par
         bombs = food = players = value = zeroes =  0
         map = []
         count = 0
 
-        for i in range(SIZE_MAP):
+        for i in range(Map.getSize()):
             rowList = []
-            for j in range(SIZE_MAP):
-                count = randrange(20) # de 0 a 19
+            for j in range(Map.getSize()):
+                count = random.randrange(20) # de 0 a 19
                 #count = count + 1
                 if count < 8:
                     bombs = bombs + 1
@@ -100,50 +90,63 @@ class Map():
             map.append(rowList)
         return map
 
-    def newPlayer(self, x, y):
-        self.setCell(x, y, Cell.JUGADOR)
 
-    def checkCell(self, cell):
+class Game():
+    def __init__(self):
+        self.map = Map()
+
+    def __str__(self):
+        return str(self.map)
+
+    def newPlayer(self, alias, x, y):
+        self.map.setCell(x, y, alias)
+
+    #def move(self, player, direc):
+    def move(self, alias, fromcell, direc):
+        tocell = fromcell + direc
+        status = self.checkPosition(tocell)
+
+        if status == Cell.NADA or status == Cell.ALIMENTO or status == Cell.MINA:
+            self.map.setCell(fromcell.getColumn(), fromcell.getRow(), Cell.NADA)
+            if status == Cell.NADA:
+                self.map.setCell(fromcell.getColumn(), tocell.getRow(), alias)
+            elif status == Cell.ALIMENTO:
+                # tu pokémon ha subido de nivel
+                self.map.setCell(fromcell.getColumn(), tocell.getRow(), alias)
+            elif status == Cell.MINA:
+                self.map.setCell(fromcell.getColumn(), tocell.getRow(), Cell.NADA)
+
+        return status, tocell
+
+    def checkPosition(self, cell):
         flag = False
         it = 0
         #comprobar qué hay en cada posición
-        for i in range(SIZE_MAP):
-            for row in self.map:
+        for i in range(Map.getSize()):
+            for row in self.map.map:
                 if flag == True:
                     break
                 it = it + 1
-                if it > cell.getColumn():
+                if it > cell.getRow():
                     flag = True
                 for ele in row:
-                    status = row[cell.getRow()]
+                    status = row[cell.getColumn()]
 
         # print(cell.getRow()) # 4, viene de (4,2)
         print(status)
         return status
 
-    def move(self, fromcell, direc):
-        tocell = fromcell + direc
-        status = self.checkCell(tocell)
+    def fight(self, player1, player2):
+        pass
 
-        if status == Cell.NADA or status == Cell.ALIMENTO or status == Cell.MINA:
-            self.setCell(fromcell.getRow(), fromcell.getColumn(), Cell.NADA)
-            if status == Cell.NADA:
-                self.setCell(tocell.getRow(), tocell.getColumn(), Cell.JUGADOR)
-            elif status == Cell.ALIMENTO:
-                # tu pokémon ha subido de nivel
-                self.setCell(tocell.getRow(), tocell.getColumn(), Cell.JUGADOR)
-            elif status == Cell.MINA:
-                self.setCell(tocell.getRow(), tocell.getColumn(), Cell.NADA)
-
-        return status, tocell
-
-    def fight(player1, player2):
+    def update(self, cell, status):
         pass
 
 
-if __name__=="__main__":
-    map = Map()
-    map.newPlayer(4,3)
-    print(map)
-    map.move(Cell(4,3), Direction.NW)
-    print(map)
+#Local test
+if __name__ == "__main__":
+    game = Game()
+    game.newPlayer("J", 4,3)
+    print(game)
+    game.move("J", Cell(4,3), Direction.S)
+    print(game)
