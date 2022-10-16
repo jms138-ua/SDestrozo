@@ -98,6 +98,11 @@ class Game():
         tocell.normalize(Map.SIZE, Map.SIZE)
         print(tocell)
         city = self.checkCity(fromcell, tocell)
+        if city != 0:
+            pass
+            # changelevel (player.ef, player.ec, city_x.temperatura):
+            # if temperatura <= 10: player.lvl = lvl + ef
+            # elif temperatura >= 25: player.lvl ) lvl + ec
         status = self.checkPosition(tocell)
 
         if status == Cell.EMPTY or status == Cell.FOOD or status == Cell.MINE:
