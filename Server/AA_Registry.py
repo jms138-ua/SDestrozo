@@ -21,15 +21,16 @@ def save_players(players):
 def create_database():
     con = sqlite3.connect(FDATA_PLAYERS)
     cur = con.cursor()
-    cur.execute("CREATE TABLE players(alias, password)")
+    cur.execute("CREATE TABLE IF NOT EXISTS players(alias varchar[50] CONSTRAINT cpk PRIMARY KEY, password varchar[50] NOT NULL)")
 
 def create_user(alias, password):
     con = sqlite3.connect(FDATA_PLAYERS)
     cur = con.cursor()
-    #cur.execute("INSERT INTO players VALUES('"+alias+"', '"+password"+')")
     cur.execute("INSERT INTO players VALUES('{alias}', '{passwd}')".format(alias=alias, passwd=password))
     con.commit()
     res = cur.execute("SELECT alias FROM players")
+    print(res.fetchall())
+    res = cur.execute("SELECT password FROM players")
     print(res.fetchall())
 
 class Player():
