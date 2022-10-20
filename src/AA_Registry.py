@@ -1,74 +1,124 @@
-'''
-- ARGS:
-    - Puerto de escucha
-- RETURNS:
-    - Nada
-- DO:
-    - Guardar jugadores en un archivo
-'''
-import sys, csv, random, sqlite3
-import AA_Engine
+from common_utils import MySocket, rundb
 
-# ADDR = ("", int(sys.argv[2]))
+from dataclasses import dataclass
+import sys
 
-FDATA_PLAYERS = "./data/db.db"
 
-def save_players(players):
-    with open(FDATA_PLAYERS, 'w') as f:
-        file = csv.writer(f)
-        file.writerow(players)
+ADDR = ("", int(sys.argv[1]))
 
-def create_database():
-    con = sqlite3.connect(FDATA_PLAYERS)
-    cur = con.cursor()
-    cur.execute("CREATE TABLE IF NOT EXISTS players(alias varchar[50] CONSTRAINT cpk PRIMARY KEY, password varchar[50] NOT NULL)")
+FDATA_DB = "../data/db.db"
 
-def create_user(alias, password):
-    con = sqlite3.connect(FDATA_PLAYERS)
-    cur = con.cursor()
-    cur.execute("INSERT INTO players VALUES('{alias}', '{passwd}')".format(alias=alias, passwd=password))
-    con.commit()
-    res = cur.execute("SELECT alias FROM players")
-    print(res.fetchall())
-    res = cur.execute("SELECT password FROM players")
-    print(res.fetchall())
 
-class Player():
+OPMSG_CREATED = "Usuario creado"
+OPMSG_UPDATED = "Usuario actualizado"
+OPMSG_DELETED = "Usuario eliminado"
+OPMSG_ALREADY_EXISTS = "El ususario ya existe"
+OPMSG_NOT_EXIST = "El ususario no existe"
+OPMSG_ERROR = "Operacion no permitida"
 
-    def __init__(self, a, p, l, ef, ec, cell):
-        self.alias = a
-        self.password = p
-        self.level = l
-        self.ef = ef
-        self.ec = ec
-        self.cell = cell
 
-    def __str__(self):
-        return self.getAlias() + ";" + self.getPassword()
+@dataclass
+class User:
+    alias: str
+    password: str
 
-    def getAlias (self):
-        return self.alias
 
-    def getPassword (self):
-        return self.password
+def create_db():
+    rundb(FDATA_DB,
+        """
+        CREATE TABLE IF NOT EXISTS players(
+            alias VARCHAR[50] PRIMARY KEY,
+            password VARCHAR[50] NOT NULL
+        )
+        """
+    )
 
-    def getLevel (self):
-        return self.level
+def select_user_db(alias):
+    res = rundb(FDATA_DB,
+        """
+        SELECT alias, password
+        FROM players
+        WHERE alias = ?
+        """
+        ,(alias,)
+    )
+    user = res.fetchone()
+    return None if user is None else User(*user)
 
-    def setLevel (self, l):
-        self.level = l
+def create_user_db(user):
+    if select_user_db(user.alias) is not None:
+        return False
 
-    def getCell (self):
-        return self.cell
+    rundb(FDATA_DB,
+        """
+        INSERT INTO players
+        VALUES(?, ?)
+        """
+        ,(user.alias, user.password)
+    )
+    return True
 
-    def setCell (self, cell):
-        self.cell = cell
+def update_user_db(alias, user):
+    if select_user_db(alias) is not None:
+        return False
 
-if __name__=="__main__":
-    cell = AA_Engine.Cell(-1,-1)
-    name = str(input("¿Cómo te llamas? "))
-    password = str(input("¿Cúal es tu contraseña? "))
-    create_database()
-    player = Player(name, password, 1, random.randint(-10, 10), random.randint(-10, 10), cell)
+    rundb(FDATA_DB,
+        """
+        UPDATE players
+        SET alias = ?, password = ?
+        WHERE alias = ?
+        """
+        ,(user.alias, user.password, alias)
+    )
+    return True
 
-    create_user(name, password)
+def delete_user_db(alias):
+    if select_user_db(alias) is not None:
+        return False
+
+    rundb(FDATA_DB,
+        """
+        DELETE
+        FROM players
+        WHERE alias = ?
+        """
+        ,(alias)
+    )
+    return True
+
+#==================================================
+
+with MySocket("TCP", ADDR) as server:
+    create_db()
+
+    while True:
+        conn, direcc = server.accept()
+        op = server.recv_msg()
+        print(direcc, "Solicita ", op)
+
+        user = User(*server.recv_msg())
+        if op == "Create":
+            iscreated = create_user_db(user)
+            server.send_msg(
+                OPMSG_CREATED if iscreated
+                else OPMSG_ALREADY_EXISTS
+            )
+
+        elif op == "Update":
+            newuser = User(*server.recv_msg())
+            isupdated = update_user_db(user.alias, newuser)
+            server.send_msg(
+                OPMSG_UPDATED if isupdated
+                else OPMSG_NOT_EXIST
+            )
+
+        elif op == "Delete":
+            isdeleted = delete_user_db(user.alias)
+            server.send_msg(
+                OPMSG_DELETED if iscreated
+                else OPMSG_NOT_EXIST
+            )
+        else:
+            server.send_msg(OPMSG_ERROR)
+
+        conn.close()
