@@ -105,15 +105,15 @@ class Game():
             # elif temperatura >= 25: player.lvl ) lvl + ec
         status = self.checkPosition(tocell)
 
-        if status == Cell.EMPTY or status == Cell.FOOD or status == Cell.MINE:
-            self.map.setCell(fromcell.getColumn(), fromcell.getRow(), Cell.EMPTY)
-            if status == Cell.EMPTY:
-                self.map.setCell(fromcell.getColumn(), tocell.getRow(), alias)
-            elif status == Cell.FOOD:
-                # tu pokémon ha subido de nivel
-                self.map.setCell(fromcell.getColumn(), tocell.getRow(), alias)
-            elif status == Cell.MINE:
-                self.map.setCell(fromcell.getColumn(), tocell.getRow(), Cell.EMPTY)
+        self.map.setCell(fromcell.getColumn(), fromcell.getRow(), Cell.EMPTY)
+
+        if status == Cell.EMPTY:
+            self.map.setCell(tocell.getColumn(), tocell.getRow(), alias)
+        elif status == Cell.FOOD:
+            # tu pokémon ha subido de nivel
+            self.map.setCell(tocell.getColumn(), tocell.getRow(), alias)
+        elif status == Cell.MINE:
+            self.map.setCell(tocell.getColumn(), tocell.getRow(), Cell.EMPTY)
 
         return status, tocell
 
