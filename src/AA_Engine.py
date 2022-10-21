@@ -1,5 +1,4 @@
 import random
-import AA_Registry
 
 class Direction():
     N = (0,-1)
@@ -10,7 +9,6 @@ class Direction():
     NE = (1,-1)
     SW = (-1,1)
     SE = (1,1)
-
 
 class Cell():
     MINE = "M"
@@ -39,6 +37,35 @@ class Cell():
     def normalize(self, columnsize, rowsize):
         self.row = self.getRow() % rowsize
         self.column = self.getColumn() % columnsize
+
+class Player():
+    def __init__(self, alias, cell, ef, ec):
+        self.cell = cell
+        self.alias = alias
+        self.level = 1
+        self.ef = ef
+        self.ec = ec
+
+    def __str__(self):
+        return "({x},{y},{z},{a},{b})".format(x=self.getAlias(), y=self.getCell(), z=self.getLevel(), a=self.getEF(), b=self.getEC())
+
+    def getCell(self):
+        return self.cell
+
+    def getAlias(self):
+        return self.alias
+    
+    def getLevel(self):
+        return self.level
+
+    def setLevel(self, value):
+        self.level = value
+
+    def getEF(self):
+        return self.ef
+    
+    def getEC(self):
+        return self.ec
 
 class Map():
     SIZE = 20
@@ -89,8 +116,10 @@ class Game():
     def __str__(self):
         return str(self.map)
 
-    def newPlayer(self, alias, x, y):
-        self.map.setCell(x, y, alias)
+    def newPlayer(self, alias, cell):
+        self.map.setCell(cell.getColumn(), cell.getRow(), alias)
+        player = Player("J", Cell(cell.getColumn(), cell.getRow()), random.randint(-10, 10), random.randint(-10, 10))
+        return player
 
     #def move(self, player, direc):
     def move(self, alias, fromcell, direc):
@@ -132,7 +161,7 @@ class Game():
                     status = row[cell.getColumn()]
 
         # print(cell.getRow()) # 4, viene de (4,2)
-        print(status)
+        # print(status)
         return status
 
     def fight(self, player1, player2):
@@ -166,8 +195,10 @@ class Game():
 #Local test
 if __name__ == "__main__":
     game = Game()
-    game.newPlayer("J", 4,19)
+    '''
+    game.newPlayer("J", Cell(4,19))
     print(game)
     game.move("J", Cell(4,19), Direction.S)
     print(game)
+    '''
 
