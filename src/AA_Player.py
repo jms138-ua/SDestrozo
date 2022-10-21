@@ -2,6 +2,7 @@ import sys
 import pygame
 import tkinter
 import math
+import random
 import tkinter.messagebox
 import tkinter.filedialog
 from pygame.locals import *
@@ -24,7 +25,7 @@ RED=(255, 0, 0)
 BLUE=(0, 0, 255)
 YELLOW=(255, 255, 0)
 
-def checkField(cell):
+def checkField(player, cell):
     if game.checkPosition(cell) == AA_Engine.Cell.MINE:
         screen.fill(RED)
         screen.blit(game_over, (200,330))
@@ -33,6 +34,10 @@ def checkField(cell):
         time.sleep(2)
         pygame.quit()
         sys.exit()
+
+    if game.checkPosition(cell) == AA_Engine.Cell.FOOD:
+        player.setLevel(player.getLevel() + 1)
+        print(player)
     '''
     if game.checkPosition(cell) == AA_Engine.Cell.FOOD:
         screen.fill(GREEN)
@@ -61,8 +66,10 @@ def printMap(map):
 
 if __name__=="__main__":
     game = AA_Engine.Game()
-    game.newPlayer("J", 4,19)
-    fromcell = AA_Engine.Cell(4,19)
+    x = 4
+    y = 19
+    player = game.newPlayer("J", AA_Engine.Cell(x, y))
+    fromcell = AA_Engine.Cell(x,y)
     pygame.init()
     
     font = pygame.font.SysFont("Verdana", 60)
@@ -85,19 +92,19 @@ if __name__=="__main__":
         for event in pygame.event.get():
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_LEFT:
-                    checkField(fromcell + AA_Engine.Direction.N)
+                    checkField(player, fromcell + AA_Engine.Direction.N)
                     game.move("J", fromcell, AA_Engine.Direction.N)
                     fromcell = fromcell + AA_Engine.Direction.N
                 if event.key == pygame.K_RIGHT:
-                    checkField(fromcell + AA_Engine.Direction.S)
+                    checkField(player, fromcell + AA_Engine.Direction.S)
                     game.move("J", fromcell, AA_Engine.Direction.S)
                     fromcell = fromcell + AA_Engine.Direction.S
                 if event.key == pygame.K_UP:
-                    checkField(fromcell + AA_Engine.Direction.W)
+                    checkField(player, fromcell + AA_Engine.Direction.W)
                     game.move("J", fromcell, AA_Engine.Direction.W)
                     fromcell = fromcell + AA_Engine.Direction.W
                 if event.key == pygame.K_DOWN:
-                    checkField(fromcell + AA_Engine.Direction.E)
+                    checkField(player, fromcell + AA_Engine.Direction.E)
                     game.move("J", fromcell, AA_Engine.Direction.E)
                     fromcell = fromcell + AA_Engine.Direction.E
                 fromcell.normalize(game.map.SIZE, game.map.SIZE)
