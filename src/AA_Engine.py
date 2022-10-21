@@ -49,6 +49,13 @@ class Player():
     def __str__(self):
         return "({x},{y},{z},{a},{b})".format(x=self.getAlias(), y=self.getCell(), z=self.getLevel(), a=self.getEF(), b=self.getEC())
 
+    # Si el nivel es mayor que cambie el estado (se lo coma)
+    def __gt__(self, other):
+        return self.getLevel() > other.getLevel()
+
+    def __lt__(self, other):
+        return self.getLevel() < other.getLevel()
+
     def getCell(self):
         return self.cell
 
@@ -139,10 +146,11 @@ class Game():
         if status == Cell.EMPTY:
             self.map.setCell(tocell.getColumn(), tocell.getRow(), alias)
         elif status == Cell.FOOD:
-            # tu pokémon ha subido de nivel
             self.map.setCell(tocell.getColumn(), tocell.getRow(), alias)
         elif status == Cell.MINE:
             self.map.setCell(tocell.getColumn(), tocell.getRow(), Cell.EMPTY)
+        else: # debe ser un jugador o un npc, así que fight
+            self.map.setCell(tocell.getColumn(), tocell.getRow(), status)
 
         return status, tocell
 
@@ -165,7 +173,15 @@ class Game():
         return status
 
     def fight(self, player1, player2):
-        pass
+        # return -1 si ha perdido, 0 si iguales y 1 si mayor
+        if player1 > player2:
+            value = 1
+        elif player1 < player2:
+            value = -1
+        else:
+            value = 0
+
+        return value
 
     def update(self, cell, status):
         pass
@@ -201,4 +217,6 @@ if __name__ == "__main__":
     game.move("J", Cell(4,19), Direction.S)
     print(game)
     '''
+
+
 
