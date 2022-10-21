@@ -35,9 +35,28 @@ def checkField(player, cell):
         pygame.quit()
         sys.exit()
 
-    if game.checkPosition(cell) == AA_Engine.Cell.FOOD:
+    elif game.checkPosition(cell) == AA_Engine.Cell.FOOD:
         player.setLevel(player.getLevel() + 1)
         print(player)
+
+    elif game.checkPosition(cell) == AA_Engine.Cell.EMPTY:
+        pass
+
+    else:
+        value = game.fight(player, npc)
+
+        if value > 0:
+            print("has ganado")
+
+        elif value < 0:
+            screen.fill(RED)
+            screen.blit(game_over, (200,330))
+           
+            pygame.display.update() 
+            time.sleep(2)
+            pygame.quit()
+            sys.exit()
+    
     '''
     if game.checkPosition(cell) == AA_Engine.Cell.FOOD:
         screen.fill(GREEN)
@@ -60,9 +79,10 @@ def printMap(map):
                 pygame.draw.rect(screen, WHITE, [(TAM+MARGEN)*col+MARGEN, (TAM+MARGEN)*fil+MARGEN, TAM, TAM], 0)
             if game.map.getCell(fil, col) == AA_Engine.Cell.FOOD:
                 pygame.draw.rect(screen, GREEN, [(TAM+MARGEN)*col+MARGEN, (TAM+MARGEN)*fil+MARGEN, TAM, TAM], 0)
-            # El jugador de prueba
             if game.map.getCell(fil, col) == "J":
                 pygame.draw.rect(screen, BLUE, [(TAM+MARGEN)*col+MARGEN, (TAM+MARGEN)*fil+MARGEN, TAM, TAM], 0)
+            if game.map.getCell(fil, col) == "NPC":
+                pygame.draw.rect(screen, YELLOW, [(TAM+MARGEN)*col+MARGEN, (TAM+MARGEN)*fil+MARGEN, TAM, TAM], 0)
 
 if __name__=="__main__":
     game = AA_Engine.Game()
@@ -70,6 +90,8 @@ if __name__=="__main__":
     y = 19
     player = game.newPlayer("J", AA_Engine.Cell(x, y))
     fromcell = AA_Engine.Cell(x,y)
+    npc = game.newPlayer("NPC", AA_Engine.Cell(4, 4))
+    npc.setLevel(10)
     pygame.init()
     
     font = pygame.font.SysFont("Verdana", 60)
@@ -87,6 +109,11 @@ if __name__=="__main__":
     running=True
 
     while running:
+
+        fuente= pygame.font.Font(None, 30)
+        texto= fuente.render("Nivel: "+str(player.getLevel()), True, YELLOW)            
+        screen.blit(texto, [width-120, AA_Engine.Map.SIZE*(TAM+MARGEN)+MARGEN+15]) 
+
         pygame.display.update()
 
         for event in pygame.event.get():
