@@ -25,12 +25,59 @@ RED=(255, 0, 0)
 BLUE=(0, 0, 255)
 YELLOW=(255, 255, 0)
 
+pygame.init()
+COLOR_INACTIVE = pygame.Color('white')
+COLOR_ACTIVE = pygame.Color('yellow')
+FONT = pygame.font.Font(None, 32)
+
+class InputBox:
+
+    def __init__(self, x, y, w, h, text):
+        self.rect = pygame.Rect(x, y, w, h)
+        self.color = COLOR_INACTIVE
+        self.text = text
+        self.txt_surface = FONT.render(text, True, self.color)
+        self.active = False
+
+    def handle_event(self, event):
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            # If the user clicked on the input_box rect.
+            if self.rect.collidepoint(event.pos):
+                # Toggle the active variable.
+                self.active = not self.active
+            else:
+                self.active = False
+            # Change the current color of the input box.
+            self.color = COLOR_ACTIVE if self.active else COLOR_INACTIVE
+        if event.type == pygame.KEYDOWN:
+            if self.active:
+                if event.key == pygame.K_RETURN:
+                    print(self.text)
+                    self.text = ''
+                elif event.key == pygame.K_BACKSPACE:
+                    self.text = self.text[:-1]
+                else:
+                    self.text += event.unicode
+                # Re-render the text.
+                self.txt_surface = FONT.render(self.text, True, self.color)
+
+    def update(self):
+        # Resize the box if the text is too long.
+        width = max(200, self.txt_surface.get_width()+10)
+        self.rect.w = width
+
+    def draw(self, screen):
+        # Blit the text.
+        screen.blit(self.txt_surface, (self.rect.x+5, self.rect.y+5))
+        # Blit the rect.
+        pygame.draw.rect(screen, self.color, self.rect, 2)
+
 def checkField(player, cell):
     if game.checkPosition(cell) == AA_Engine.Cell.MINE:
         screen.fill(RED)
         screen.blit(game_over, (200,330))
-           
-        pygame.display.update() 
+
+        pygame.display.update()
         time.sleep(2)
         pygame.quit()
         sys.exit()
@@ -51,18 +98,18 @@ def checkField(player, cell):
         elif value < 0:
             screen.fill(RED)
             screen.blit(game_over, (200,330))
-           
-            pygame.display.update() 
+
+            pygame.display.update()
             time.sleep(2)
             pygame.quit()
             sys.exit()
-    
+
     '''
     if game.checkPosition(cell) == AA_Engine.Cell.FOOD:
         screen.fill(GREEN)
         screen.blit(you_win, (230,330))
-           
-        pygame.display.update() 
+
+        pygame.display.update()
         time.sleep(2)
         pygame.quit()
         sys.exit()
@@ -93,11 +140,11 @@ if __name__=="__main__":
     npc = game.newPlayer("NPC", AA_Engine.Cell(4, 4))
     npc.setLevel(10)
     pygame.init()
-    
+
     font = pygame.font.SysFont("Verdana", 60)
     game_over = font.render("Game Over", True, BLACK)
     you_win = font.render("You Win", True, BLACK)
-    
+
     clock = pygame.time.Clock()
 
     width = game.map.SIZE*(TAM+MARGEN) + MARGEN
@@ -106,13 +153,25 @@ if __name__=="__main__":
     screen=pygame.display.set_mode(dimension)
     pygame.display.set_caption("SDestrozo")
 
+    active = False
+    text = ''
+    font2 = pygame.font.Font(None, 32)
+
+    text_input_box1 = InputBox(0, 700, width/2 - 100, 32, "Usuario")
+    text_input_box2 = InputBox(0, 733, width/2 - 100, 32, "Contraseña")
+    input_boxes = [text_input_box1, text_input_box2]
+
     running=True
 
     while running:
 
         fuente= pygame.font.Font(None, 30)
-        texto= fuente.render("Nivel: "+str(player.getLevel()), True, YELLOW)            
-        screen.blit(texto, [width-120, AA_Engine.Map.SIZE*(TAM+MARGEN)+MARGEN+15]) 
+        if player.getLevel() < 1:
+            texto= fuente.render("Nivel: "+str(player.getLevel()), True, BLACK)
+            screen.blit(texto, [width-120, AA_Engine.Map.SIZE*(TAM+MARGEN)+MARGEN+15])
+        else:
+            texto= fuente.render("Nivel: "+str(player.getLevel()), True, YELLOW)
+            screen.blit(texto, [width-120, AA_Engine.Map.SIZE*(TAM+MARGEN)+MARGEN+15])
 
         pygame.display.update()
 
@@ -120,23 +179,31 @@ if __name__=="__main__":
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_LEFT:
                     checkField(player, fromcell + AA_Engine.Direction.N)
-                    game.move("J", fromcell, AA_Engine.Direction.N)
+                    game.move(player.getAlias(), fromcell, AA_Engine.Direction.N)
                     fromcell = fromcell + AA_Engine.Direction.N
                 if event.key == pygame.K_RIGHT:
                     checkField(player, fromcell + AA_Engine.Direction.S)
-                    game.move("J", fromcell, AA_Engine.Direction.S)
+                    game.move(player.getAlias(), fromcell, AA_Engine.Direction.S)
                     fromcell = fromcell + AA_Engine.Direction.S
                 if event.key == pygame.K_UP:
                     checkField(player, fromcell + AA_Engine.Direction.W)
-                    game.move("J", fromcell, AA_Engine.Direction.W)
+                    game.move(player.getAlias(), fromcell, AA_Engine.Direction.W)
                     fromcell = fromcell + AA_Engine.Direction.W
                 if event.key == pygame.K_DOWN:
                     checkField(player, fromcell + AA_Engine.Direction.E)
-                    game.move("J", fromcell, AA_Engine.Direction.E)
+                    game.move(player.getAlias(), fromcell, AA_Engine.Direction.E)
                     fromcell = fromcell + AA_Engine.Direction.E
                 fromcell.normalize(game.map.SIZE, game.map.SIZE)
             if event.type == pygame.QUIT:
                 running = False
+            for box in input_boxes:
+                box.handle_event(event)
+
+        for box in input_boxes:
+            box.update()
+            box.draw(screen)
+
+        pygame.display.flip()
 
         clock.tick(40)
 
