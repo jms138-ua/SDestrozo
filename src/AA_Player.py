@@ -8,7 +8,7 @@ import tkinter.filedialog
 from pygame.locals import *
 import time
 from random import randrange
-import AA_Engine
+import AA_Engine, AA_Registry
 
 SIZE_MAP = 20
 SIZE_CITY = SIZE_MAP / 2
@@ -38,6 +38,8 @@ class InputBox:
         self.text = text
         self.txt_surface = FONT.render(text, True, self.color)
         self.active = False
+        self.done = False
+        self.textcopy = ''
 
     def handle_event(self, event):
         if event.type == pygame.MOUSEBUTTONDOWN:
@@ -49,10 +51,13 @@ class InputBox:
                 self.active = False
             # Change the current color of the input box.
             self.color = COLOR_ACTIVE if self.active else COLOR_INACTIVE
+            self.txt_surface = FONT.render(self.text, True, self.color)
         if event.type == pygame.KEYDOWN:
             if self.active:
                 if event.key == pygame.K_RETURN:
                     print(self.text)
+                    self.done = True
+                    self.textcopy = self.text
                     self.text = ''
                 elif event.key == pygame.K_BACKSPACE:
                     self.text = self.text[:-1]
@@ -66,11 +71,16 @@ class InputBox:
         width = max(200, self.txt_surface.get_width()+10)
         self.rect.w = width
 
-    def draw(self, screen):
-        # Blit the text.
-        screen.blit(self.txt_surface, (self.rect.x+5, self.rect.y+5))
-        # Blit the rect.
-        pygame.draw.rect(screen, self.color, self.rect, 2)
+    def draw(self, screen, login):
+        if self.done == True and login == True:
+            self.txt_surface = FONT.render('', True, 'black')
+            screen.blit(self.txt_surface, (self.rect.x+5, self.rect.y+5))
+            pygame.draw.rect(screen, 'black', self.rect, 2)
+        else:
+            # Blit the text.
+            screen.blit(self.txt_surface, (self.rect.x+5, self.rect.y+5))
+            # Blit the rect.
+            pygame.draw.rect(screen, self.color, self.rect, 2)
 
 def checkField(player, cell):
     if game.checkPosition(cell) == AA_Engine.Cell.MINE:
@@ -90,7 +100,8 @@ def checkField(player, cell):
         pass
 
     else:
-        value = game.fight(player, npc)
+        # value = game.fight(player, npc)
+        value = 0
 
         if value > 0:
             print("has ganado")
@@ -122,23 +133,29 @@ def printMap(map):
         for col in range(game.map.SIZE):
             if game.map.getCell(fil, col) == AA_Engine.Cell.MINE:
                 pygame.draw.rect(screen, RED, [(TAM+MARGEN)*col+MARGEN, (TAM+MARGEN)*fil+MARGEN, TAM, TAM], 0)
-            if game.map.getCell(fil, col) == AA_Engine.Cell.EMPTY:
+            elif game.map.getCell(fil, col) == AA_Engine.Cell.EMPTY:
                 pygame.draw.rect(screen, WHITE, [(TAM+MARGEN)*col+MARGEN, (TAM+MARGEN)*fil+MARGEN, TAM, TAM], 0)
-            if game.map.getCell(fil, col) == AA_Engine.Cell.FOOD:
+            elif game.map.getCell(fil, col) == AA_Engine.Cell.FOOD:
                 pygame.draw.rect(screen, GREEN, [(TAM+MARGEN)*col+MARGEN, (TAM+MARGEN)*fil+MARGEN, TAM, TAM], 0)
-            if game.map.getCell(fil, col) == "J":
+            else:
                 pygame.draw.rect(screen, BLUE, [(TAM+MARGEN)*col+MARGEN, (TAM+MARGEN)*fil+MARGEN, TAM, TAM], 0)
-            if game.map.getCell(fil, col) == "NPC":
-                pygame.draw.rect(screen, YELLOW, [(TAM+MARGEN)*col+MARGEN, (TAM+MARGEN)*fil+MARGEN, TAM, TAM], 0)
 
 if __name__=="__main__":
+
+    root=tkinter.Tk()
+    root.withdraw()
+
+    x = random.randint(0, 19)
+    y = random.randint(0, 19)
+
     game = AA_Engine.Game()
-    x = 4
-    y = 19
-    player = game.newPlayer("J", AA_Engine.Cell(x, y))
+    player = None
     fromcell = AA_Engine.Cell(x,y)
-    npc = game.newPlayer("NPC", AA_Engine.Cell(4, 4))
-    npc.setLevel(10)
+    
+    # npc de prueba para testear el fight, falta una interacción
+    # npc = game.newPlayer("NPC", AA_Engine.Cell(4, 4))
+    # npc.setLevel(10)
+
     pygame.init()
 
     font = pygame.font.SysFont("Verdana", 60)
@@ -156,24 +173,60 @@ if __name__=="__main__":
     active = False
     text = ''
     font2 = pygame.font.Font(None, 32)
+    user = ''
+    passwd = ''
 
     text_input_box1 = InputBox(0, 700, width/2 - 100, 32, "Usuario")
     text_input_box2 = InputBox(0, 733, width/2 - 100, 32, "Contraseña")
     input_boxes = [text_input_box1, text_input_box2]
 
     running=True
+    start = False
+    login = False
+    created = False
 
     while running:
 
-        fuente= pygame.font.Font(None, 30)
-        if player.getLevel() < 1:
-            texto= fuente.render("Nivel: "+str(player.getLevel()), True, BLACK)
+        if login == False:
+
+            fuente= pygame.font.Font(None, 30)
+            texto= fuente.render("", True, BLACK)
             screen.blit(texto, [width-120, AA_Engine.Map.SIZE*(TAM+MARGEN)+MARGEN+15])
-        else:
+
+            pygame.display.update()
+
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    running = False
+                for box in input_boxes:
+                    box.handle_event(event)
+
+            if input_boxes[0].done == True:
+                user = input_boxes[0].textcopy
+            if input_boxes[1].done == True:
+                passwd = input_boxes[1].textcopy
+        
+            # !!! CREAR PRIMERO EL USUARIO DESDE AA_Registry.create_user o no va
+            if user != '' and passwd != '':
+                AA_Registry.create_db()
+                # create user if not exists? puede ser buena idea
+                # AA_Registry.create_user_db(user,passwd)
+                res = AA_Registry.select_user_db(user, passwd)
+
+                if (res != None):
+                    login = True
+
+            for box in input_boxes:
+                box.update()
+                box.draw(screen, login)
+            
+        if login == True:
             texto= fuente.render("Nivel: "+str(player.getLevel()), True, YELLOW)
             screen.blit(texto, [width-120, AA_Engine.Map.SIZE*(TAM+MARGEN)+MARGEN+15])
 
-        pygame.display.update()
+        if created == False:
+            player = game.newPlayer(input_boxes[0].textcopy, AA_Engine.Cell(x, y))
+            created = True
 
         for event in pygame.event.get():
             if event.type == pygame.KEYDOWN:
@@ -181,27 +234,19 @@ if __name__=="__main__":
                     checkField(player, fromcell + AA_Engine.Direction.N)
                     game.move(player.getAlias(), fromcell, AA_Engine.Direction.N)
                     fromcell = fromcell + AA_Engine.Direction.N
-                if event.key == pygame.K_RIGHT:
+                elif event.key == pygame.K_RIGHT:
                     checkField(player, fromcell + AA_Engine.Direction.S)
                     game.move(player.getAlias(), fromcell, AA_Engine.Direction.S)
                     fromcell = fromcell + AA_Engine.Direction.S
-                if event.key == pygame.K_UP:
+                elif event.key == pygame.K_UP:
                     checkField(player, fromcell + AA_Engine.Direction.W)
                     game.move(player.getAlias(), fromcell, AA_Engine.Direction.W)
                     fromcell = fromcell + AA_Engine.Direction.W
-                if event.key == pygame.K_DOWN:
+                elif event.key == pygame.K_DOWN:
                     checkField(player, fromcell + AA_Engine.Direction.E)
                     game.move(player.getAlias(), fromcell, AA_Engine.Direction.E)
                     fromcell = fromcell + AA_Engine.Direction.E
                 fromcell.normalize(game.map.SIZE, game.map.SIZE)
-            if event.type == pygame.QUIT:
-                running = False
-            for box in input_boxes:
-                box.handle_event(event)
-
-        for box in input_boxes:
-            box.update()
-            box.draw(screen)
 
         pygame.display.flip()
 
