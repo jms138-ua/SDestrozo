@@ -33,14 +33,15 @@ def create_db():
         """
     )
 
-def select_user_db(alias):
+def select_user_db(alias, password):
     res = rundb(FDATA_DB,
         """
         SELECT alias, password
         FROM players
         WHERE alias = ?
+        AND password = ?
         """
-        ,(alias,)
+        ,(alias, password)
     )
     user = res.fetchone()
     return None if user is None else User(*user)
