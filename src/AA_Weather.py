@@ -1,3 +1,7 @@
+"""
+client.recv_obj()
+"""
+
 from common_utils import MySocket
 
 from dataclasses import dataclass, asdict

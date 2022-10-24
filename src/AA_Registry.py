@@ -1,3 +1,16 @@
+"""
+client.send_msg("Create"|"Delete")
+client.send_obj(("user","password"))
+client.recv_msg() -> MSGOPRE
+
+//////////////////////////////////////////
+
+client.send_msg("Update")
+client.send_obj(("user","password"))
+client.send_obj(("newuser","newpassword"))
+client.recv_msg() -> MSGOPRE
+"""
+
 from common_utils import MySocket, rundb
 
 from dataclasses import dataclass
@@ -8,13 +21,12 @@ ADDR = ("", int(sys.argv[1]))
 
 FDATA_DB = "../data/db.db"
 
-
-OPMSG_CREATED = "Usuario creado"
-OPMSG_UPDATED = "Usuario actualizado"
-OPMSG_DELETED = "Usuario eliminado"
-OPMSG_ALREADY_EXISTS = "El ususario ya existe"
-OPMSG_NOT_EXIST = "El ususario no existe"
-OPMSG_ERROR = "Operacion no permitida"
+MSGOP_CREATED = "Usuario creado"
+MSGOP_UPDATED = "Usuario actualizado"
+MSGOP_DELETED = "Usuario eliminado"
+MSGOP_ALREADY_EXISTS = "El ususario ya existe"
+MSGOPRE_NOT_EXIST = "La cuenta no coincide con ninguna registrada"
+MSGOPRE_ERROR = "Operacion no permitida"
 
 
 @dataclass
@@ -33,15 +45,14 @@ def create_db():
         """
     )
 
-def select_user_db(alias, password):
+def select_user_db(alias):
     res = rundb(FDATA_DB,
         """
         SELECT alias, password
         FROM players
         WHERE alias = ?
-        AND password = ?
         """
-        ,(alias, password)
+        ,(alias,)
     )
     user = res.fetchone()
     return None if user is None else User(*user)
@@ -60,7 +71,7 @@ def create_user_db(user):
     return True
 
 def update_user_db(alias, user):
-    if select_user_db(alias) is not None:
+    if select_user_db(alias) is None:
         return False
 
     rundb(FDATA_DB,
@@ -74,7 +85,7 @@ def update_user_db(alias, user):
     return True
 
 def delete_user_db(alias):
-    if select_user_db(alias) is not None:
+    if select_user_db(alias) is None:
         return False
 
     rundb(FDATA_DB,
@@ -83,9 +94,13 @@ def delete_user_db(alias):
         FROM players
         WHERE alias = ?
         """
-        ,(alias)
+        ,(alias,)
     )
     return True
+
+def user_correct_login_db(user):
+    user_fetch = select_user_db(user.alias)
+    return user_fetch is not None and user_fetch.password == user.password
 
 #==================================================
 
@@ -95,31 +110,47 @@ with MySocket("TCP", ADDR) as server:
     while True:
         conn, direcc = server.accept()
         op = server.recv_msg()
-        print(direcc, "Solicita ", op)
+        user = User(*server.recv_obj())
+        print(direcc, "Solicita", op, "sobre", user)
 
-        user = User(*server.recv_msg())
         if op == "Create":
             iscreated = create_user_db(user)
             server.send_msg(
-                OPMSG_CREATED if iscreated
-                else OPMSG_ALREADY_EXISTS
+                MSGOP_CREATED if iscreated
+                else MSGOP_ALREADY_EXISTS
             )
+            if isdeleted:
+                print(direcc, "Ha creado el usaurio")
 
         elif op == "Update":
-            newuser = User(*server.recv_msg())
-            isupdated = update_user_db(user.alias, newuser)
-            server.send_msg(
-                OPMSG_UPDATED if isupdated
-                else OPMSG_NOT_EXIST
-            )
+            if user_correct_login_db(user):
+                newuser = User(*server.recv_obj())
+                if newuser != user:
+                    isupdated = update_user_db(user.alias, newuser)
+                    server.send_msg(
+                        MSGOP_UPDATED if isupdated
+                        else MSGOP_ALREADY_EXISTS
+                    )
+                    if isupdated:
+                        print(direcc, "Ha cambiado el usuario a", newuser)
+                else:
+                    server.send_msg(MSGOP_ALREADY_EXISTS)
+            else:
+                server.send_msg(MSGOPRE_NOT_EXIST)
 
         elif op == "Delete":
-            isdeleted = delete_user_db(user.alias)
-            server.send_msg(
-                OPMSG_DELETED if iscreated
-                else OPMSG_NOT_EXIST
-            )
+            if user_correct_login_db(user):
+                isdeleted = delete_user_db(user.alias)
+                server.send_msg(
+                    MSGOP_DELETED if isdeleted
+                    else MSGOP_NOT_EXIST
+                )
+                if isdeleted:
+                    print(direcc, "Ha eliminado el usaurio")
+            else:
+                server.send_msg(MSGOPRE_NOT_EXIST)
+
         else:
-            server.send_msg(OPMSG_ERROR)
+            server.send_msg(MSGOP_ERROR)
 
         conn.close()
