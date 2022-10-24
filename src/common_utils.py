@@ -1,4 +1,4 @@
-import socket, pickle
+import socket, pickle, struct
 import sqlite3
 
 
@@ -11,48 +11,46 @@ class MySocket(socket.socket):
         if not len(addr[0]):
             self.bind(addr)
             self.listen()
-            self.conn = None
-            self.client = None
+            self.conn = {}
         else:
             self.connect(addr)
-            self.conn = self
+            self.conn = {"None":self}
 
     def accept(self):
-        self.conn, self.client = super().accept()
-        return self.conn, self.client
+        conn, client = super().accept()
+        self.conn["None"] = conn
+        self.conn[client] = conn
+        return conn, client
 
     def close(self):
         self.conn, self.client = None, None
         super().close()
 
-    def send_msg(self, msg):
-        self.conn.sendall(msg.encode("utf-8"))
+    def pack(data):
+        packet_len = struct.pack("!I", len(data))
+        return packet_len + data
 
-    def send_obj(self, obj):
-        self.conn.sendall(pickle.dumps(obj))
+    def send_msg(self, msg, client="None"):
+        self.conn[client].sendall(MySocket.pack(msg.encode("utf-8")))
 
-    def recvall(self):
-        return MySocket.recvall(self.conn)
+    def send_obj(self, obj, client="None"):
+        self.conn[client].sendall(MySocket.pack(pickle.dumps(obj)))
+
+    def recv_confirmed(conn, buf_len):
+        buf = b""
+        while len(buf) < buf_len:
+            buf += conn.recv(buf_len-len(buf))
+        return buf
 
     def recvall(conn):
-        datos = b""
-        buff_size = 1024
+        buf_len = struct.unpack("!I", MySocket.recv_confirmed(conn,4))[0]
+        return MySocket.recv_confirmed(conn, buf_len)
 
-        conn.setblocking(True)
-        try:
-            while True:
-                datos += conn.recv(buff_size)
-                conn.setblocking(False)
-        except socket.error: pass
-        conn.setblocking(True)
+    def recv_msg(self, client="None"):
+        return MySocket.recvall(self.conn[client]).decode("utf-8")
 
-        return datos
-
-    def recv_msg(self):
-        return MySocket.recvall(self.conn).decode("utf-8")
-
-    def recv_obj(self):
-        return pickle.loads(MySocket.recvall(self.conn))
+    def recv_obj(self, client="None"):
+        return pickle.loads(MySocket.recvall(self.conn[client]))
 
 
 def rundb(dbfile, query, parameters=()):
