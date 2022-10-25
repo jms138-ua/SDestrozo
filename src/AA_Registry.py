@@ -24,9 +24,9 @@ FDATA_DB = "../data/db.db"
 MSGOP_CREATED = "Usuario creado"
 MSGOP_UPDATED = "Usuario actualizado"
 MSGOP_DELETED = "Usuario eliminado"
-MSGOPRE_ALREADY_EXISTS = "El usuario ya existe"
-MSGOPRE_NOT_EXIST = "La cuenta no coincide con ninguna registrada"
-MSGOPRE_ERROR = "Operacion no permitida"
+MSGERROP_ALREADY_EXISTS = "Error. El usuario ya existe"
+MSGERROP_NOT_EXISTS = "Error. La cuenta no coincide con ninguna registrada"
+MSGERROP_ERROR = "Error. Operacion no permitida"
 
 
 @dataclass
@@ -117,7 +117,7 @@ with MySocket("TCP", ADDR) as server:
             iscreated = create_user_db(user)
             server.send_msg(
                 MSGOP_CREATED if iscreated
-                else MSGOPRE_ALREADY_EXISTS
+                else MSGERROP_ALREADY_EXISTS
             )
             if iscreated:
                 print(direcc, "Ha creado el usaurio")
@@ -129,28 +129,28 @@ with MySocket("TCP", ADDR) as server:
                     isupdated = update_user_db(user.alias, newuser)
                     server.send_msg(
                         MSGOP_UPDATED if isupdated
-                        else MSGOPRE_ALREADY_EXISTS
+                        else MSGERROP_ALREADY_EXISTS
                     )
                     if isupdated:
                         print(direcc, "Ha cambiado el usuario a", newuser)
                 else:
-                    server.send_msg(MSGOPRE_ALREADY_EXISTS)
+                    server.send_msg(MSGERROP_ALREADY_EXISTS)
             else:
-                server.send_msg(MSGOPRE_NOT_EXIST)
+                server.send_msg(MSGERROP_NOT_EXISTS)
 
         elif op == "Delete":
             if user_correct_login_db(user):
                 isdeleted = delete_user_db(user.alias)
                 server.send_msg(
                     MSGOP_DELETED if isdeleted
-                    else MSGOPRE_NOT_EXIST
+                    else MSGERROP_NOT_EXISTS
                 )
                 if isdeleted:
                     print(direcc, "Ha eliminado el usuario")
             else:
-                server.send_msg(MSGOPRE_NOT_EXIST)
+                server.send_msg(MSGERROP_NOT_EXISTS)
 
         else:
-            server.send_msg(MSGOPRE_ERROR)
+            server.send_msg(MSGERROP_ERROR)
 
         conn.close()
