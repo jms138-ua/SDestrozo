@@ -24,7 +24,7 @@ FDATA_DB = "../data/db.db"
 MSGOP_CREATED = "Usuario creado"
 MSGOP_UPDATED = "Usuario actualizado"
 MSGOP_DELETED = "Usuario eliminado"
-MSGOP_ALREADY_EXISTS = "El ususario ya existe"
+MSGOPRE_ALREADY_EXISTS = "El ususario ya existe"
 MSGOPRE_NOT_EXIST = "La cuenta no coincide con ninguna registrada"
 MSGOPRE_ERROR = "Operacion no permitida"
 
@@ -117,7 +117,7 @@ with MySocket("TCP", ADDR) as server:
             iscreated = create_user_db(user)
             server.send_msg(
                 MSGOP_CREATED if iscreated
-                else MSGOP_ALREADY_EXISTS
+                else MSGOPRE_ALREADY_EXISTS
             )
             if isdeleted:
                 print(direcc, "Ha creado el usaurio")
@@ -129,12 +129,12 @@ with MySocket("TCP", ADDR) as server:
                     isupdated = update_user_db(user.alias, newuser)
                     server.send_msg(
                         MSGOP_UPDATED if isupdated
-                        else MSGOP_ALREADY_EXISTS
+                        else MSGOPRE_ALREADY_EXISTS
                     )
                     if isupdated:
                         print(direcc, "Ha cambiado el usuario a", newuser)
                 else:
-                    server.send_msg(MSGOP_ALREADY_EXISTS)
+                    server.send_msg(MSGOPRE_ALREADY_EXISTS)
             else:
                 server.send_msg(MSGOPRE_NOT_EXIST)
 
@@ -143,7 +143,7 @@ with MySocket("TCP", ADDR) as server:
                 isdeleted = delete_user_db(user.alias)
                 server.send_msg(
                     MSGOP_DELETED if isdeleted
-                    else MSGOP_NOT_EXIST
+                    else MSGOPRE_NOT_EXIST
                 )
                 if isdeleted:
                     print(direcc, "Ha eliminado el usaurio")
@@ -151,6 +151,6 @@ with MySocket("TCP", ADDR) as server:
                 server.send_msg(MSGOPRE_NOT_EXIST)
 
         else:
-            server.send_msg(MSGOP_ERROR)
+            server.send_msg(MSGOPRE_ERROR)
 
         conn.close()
