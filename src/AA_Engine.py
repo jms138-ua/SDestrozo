@@ -1,4 +1,66 @@
-import random
+from socket import socket
+from common_utils import socket, MySocket, rundb
+
+import sys, threading, time, random
+
+
+ADDR = ("", int(sys.argv[1]))
+ADDR__AA_WEATHER = ("localhost", int(sys.argv[3]))
+
+FDATA_DB = "../data/db.db"
+
+MAX_PLAYERS = int(sys.argv[2])
+
+MSGREJOIN = "Usuario unido a la partida"
+MSGERRJOIN_NOT_EXISTS = "Error. La cuenta no coincide con ninguna registrada"
+MSGERRJOIN_ALREADY_JOINED = "Error. Usuario ya unido a la partida"
+
+
+class Requests():
+
+    @staticmethod
+    def get_cities(n):
+        cities = set()
+        while(len(cities) < 4):
+            with MySocket("TCP", ADDR__AA_WEATHER) as client:
+                citie = client.recv_obj()
+                if citie["city"] not in cities:
+                    cities.add(citie["city"])
+                    yield citie
+
+
+class Player():
+    def __init__(self, alias, password):
+        self.alias = alias
+        self.password = password
+        self.pos = Cell(-1, -1)
+        self.ef = random.randint(-10,10)
+        self.ec = random.randint(-10,10)
+        self.__level = 1
+        self.temperature = None
+
+    def __str__(self):
+        return "Usuario " + self.alias + ", con nivel " + str(self.getTotalLevel())
+
+    def isAlive(self):
+        return self.__level != -1
+
+    def die(self):
+        self.__level = -1
+
+    def upLevel(self):
+        self.__level += 1
+
+    def getTotalLevel(self):
+        if self.temperature is None:
+            return self.__level
+        elif self.temperature <= 10:
+            return self.__level + self.ef
+        elif self.temperature >= 25:
+            return self.__level + self.ec
+        else:
+            return self.__level
+
 
 class Direction():
     N = (0,-1)
@@ -10,23 +72,26 @@ class Direction():
     SW = (-1,1)
     SE = (1,1)
 
+
 class Cell():
     MINE = "M"
     FOOD= "A"
     EMPTY = " "
+
+    NOTPLAYER = (MINE, FOOD, EMPTY)
 
     def __init__(self, column, row):
         self.row = row
         self.column = column
 
     def __str__(self):
-        return "({x},{y})".format(x=self.getColumn(), y=self.getRow())
+        return "({i},{j})".format(i=self.column, j=self.row)
 
     def __eq__(self, other):
-        return self.getColumn() == other.getColumn() and self.getRow() == other.getRow()
+        return self.column == other.getColumn() and self.row == other.getRow()
 
     def __add__(self, direc):
-        return Cell(self.getColumn()+direc[0], self.getRow()+direc[1])
+        return Cell(self.column+direc[0], self.row+direc[1])
 
     def getColumn(self):
         return self.column
@@ -35,44 +100,9 @@ class Cell():
         return self.row
 
     def normalize(self, columnsize, rowsize):
-        self.row = self.getRow() % rowsize
-        self.column = self.getColumn() % columnsize
+        self.row %= rowsize
+        self.column %= columnsize
 
-class Player():
-    def __init__(self, alias, cell, ef, ec):
-        self.cell = cell
-        self.alias = alias
-        self.level = 1
-        self.ef = ef
-        self.ec = ec
-
-    def __str__(self):
-        return "({x},{y},{z},{a},{b})".format(x=self.getAlias(), y=self.getCell(), z=self.getLevel(), a=self.getEF(), b=self.getEC())
-
-    # Si el nivel es mayor que cambie el estado (se lo coma)
-    def __gt__(self, other):
-        return self.getLevel() > other.getLevel()
-
-    def __lt__(self, other):
-        return self.getLevel() < other.getLevel()
-
-    def getCell(self):
-        return self.cell
-
-    def getAlias(self):
-        return self.alias
-    
-    def getLevel(self):
-        return self.level
-
-    def setLevel(self, value):
-        self.level = value
-
-    def getEF(self):
-        return self.ef
-    
-    def getEC(self):
-        return self.ec
 
 class Map():
     SIZE = 20
@@ -84,14 +114,14 @@ class Map():
     ]
 
     def __init__(self):
-        self.map = self.newRandMap()
+        self.map = Map.newRandMap()
 
     def __str__(self):
         strmap = ""
         for j, row in enumerate(self.map):
             strmap += "|"
             for i, value in enumerate(row):
-                strmap += value
+                strmap += str(value)
                 strmap += "|"
             strmap += "\n"
         return strmap
@@ -99,13 +129,22 @@ class Map():
     def getMap(self):
         return self.map
 
-    def getCell(self, i, j):
-        return self.map[j][i]
+    def getCell(self, cell):
+        return self.map[cell.getRow()-1][cell.getColumn()-1]
 
-    def setCell(self, i, j, value):
-        self.map[j][i] = value
+    def setCell(self, cell, value):
+        self.map[cell.getRow()-1][cell.getColumn()-1] = value
 
-    def newRandMap(self):
+    def setValueCell(self, cell, value):
+        if self.getCell(cell) in Cell.NOTPLAYER:
+            self.setCell(cell, [value,])
+        else:
+            self.map[cell.getRow()-1][cell.getColumn()-1].append(value)
+
+    def delValueCell(self, cell, value):
+        self.map[cell.getRow()-1][cell.getColumn()-1].remove(value)
+
+    def newRandMap():
         map = []
         for _ in range(Map.SIZE):
             row = []
@@ -115,108 +154,188 @@ class Map():
             map.append(row)
         return map
 
+    def getCity(cities, cell):
+        '''
+        |0|1|
+        |2|3|
+        '''
+        if cell.getColumn() < Map.SIZE_CITY:
+            if cell.getRow() < Map.SIZE_CITY:
+                return cities[0]
+            else:
+                return cities[1]
+        else:
+            if cell.getRow() < Map.SIZE_CITY:
+                return cities[2]
+            else:
+                return cities[3]
+
 
 class Game():
     def __init__(self):
         self.map = Map()
+        self.cities = list(Requests.get_cities(4))
+        self.players = dict()
 
     def __str__(self):
-        return str(self.map)
+        strgame = str(self.map)
+        for player in self.players.values():
+            strgame += str(player) + "\n"
+        return strgame
 
-    def newPlayer(self, alias, cell):
-        self.map.setCell(cell.getColumn(), cell.getRow(), alias)
-        player = Player("J", Cell(cell.getColumn(), cell.getRow()), random.randint(-10, 10), random.randint(-10, 10))
-        return player
+    def updatePlayer(self, player, pos):
+        player.pos = pos
+        player.temperature = Map.getCity(self.cities, pos)["temperature"]
 
-    #def move(self, player, direc):
-    def move(self, alias, fromcell, direc):
-        tocell = fromcell + direc
-        tocell.normalize(Map.SIZE, Map.SIZE)
-        print(tocell)
-        city = self.checkCity(fromcell, tocell)
-        if city != 0:
-            pass
-            # changelevel (player.ef, player.ec, city_x.temperatura):
-            # if temperatura <= 10: player.lvl = lvl + ef
-            # elif temperatura >= 25: player.lvl ) lvl + ec
-        status = self.checkPosition(tocell)
+    def newRandPlayer(self, player):
+        while True:
+            i = random.randint(1,Map.SIZE)
+            j = random.randint(1,Map.SIZE)
+            pos = Cell(i,j)
 
-        self.map.setCell(fromcell.getColumn(), fromcell.getRow(), Cell.EMPTY)
+            if self.map.getCell(pos) == Cell.EMPTY:
+                self.updatePlayer(player, pos)
+                self.players[player.alias] = player
+                self.map.setValueCell(pos, player.alias)
+                break
 
-        if status == Cell.EMPTY:
-            self.map.setCell(tocell.getColumn(), tocell.getRow(), alias)
-        elif status == Cell.FOOD:
-            self.map.setCell(tocell.getColumn(), tocell.getRow(), alias)
-        elif status == Cell.MINE:
-            self.map.setCell(tocell.getColumn(), tocell.getRow(), Cell.EMPTY)
-        else: # debe ser un jugador o un npc, así que fight
-            self.map.setCell(tocell.getColumn(), tocell.getRow(), status)
+    def move(self, playeralias, direc):
+        player = self.players[playeralias]
+        topos = (player.pos + direc)
+        topos.normalize(Map.SIZE,Map.SIZE)
+        self.update(player, topos)
 
-        return status, tocell
+    def update(self, player, topos):
+        self.map.setCell(player.pos, Cell.EMPTY)
+        self.updatePlayer(player, topos)
 
-    def checkPosition(self, cell):
-        flag = False
-        it = 0
-        #comprobar qué hay en cada posición
-        for i in range(Map.SIZE):
-            for row in self.map.map:
-                if flag == True:
-                    break
-                it = it + 1
-                if it > cell.getRow():
-                    flag = True
-                for ele in row:
-                    status = row[cell.getColumn()]
-
-        # print(cell.getRow()) # 4, viene de (4,2)
-        # print(status)
-        return status
-
-    def fight(self, player1, player2):
-        # return -1 si ha perdido, 0 si iguales y 1 si mayor
-        if player1 > player2:
-            value = 1
-        elif player1 < player2:
-            value = -1
+        value = self.map.getCell(topos)
+        if value == Cell.EMPTY:
+            self.map.setValueCell(topos, player.alias)
+        elif value == Cell.FOOD:
+            self.map.setValueCell(topos, player.alias)
+            player.upLevel()
+        elif value == Cell.MINE:
+            self.map.setCell(topos, Cell.EMPTY)
+            self.players.pop(player.alias)
+            player.die()
         else:
-            value = 0
+            self.map.setValueCell(topos, player.alias)
+            self.fight(player)
 
-        return value
+    def fight(self, player1):
+        for player2 in self.players.values():
+            if player2.pos == player.pos and player.getTotalLevel() != player2.getTotalLevel():
+                playertodel = max(player1, player2, key=lambda player: player.getTotalLevel())
+                self.map.delValueCell(playertodel.pos, playertodel.alias)
+                self.players.pop(playertodel.alias)
+                playertodel.die()
 
-    def update(self, cell, status):
-        pass
+#==================================================
 
-    def checkCity(self, fromcell, tocell):
-        city = 0
+def print_count(text, textargs, nreverselines):
+    if nreverselines == -1:
+        sys.stdout.write(text.format(*textargs))
+        sys.stdout.write("\n")
+    else:
+        sys.stdout.write("\033[{n}A".format(n=nreverselines+1))
+        sys.stdout.write(text.format(*textargs))
+        sys.stdout.write("\033[{n}B".format(n=nreverselines+1))
+        sys.stdout.write("\033[0G")
+    sys.stdout.flush()
 
-        if tocell.getRow() <= Map.SIZE_CITY and tocell.getColumn() <= Map.SIZE_CITY:
-            if fromcell.getRow() > Map.SIZE_CITY or fromcell.getColumn() > Map.SIZE_CITY:
-                print("Cambio a ciudad 1")
-                city = 1
-        elif tocell.getRow() <= Map.SIZE_CITY and tocell.getColumn() > Map.SIZE_CITY:
-            if fromcell.getRow() > Map.SIZE_CITY or fromcell.getColumn() <= Map.SIZE_CITY:
-                print("Cambio a ciudad 2")
-                city = 2
-        elif tocell.getRow() > Map.SIZE_CITY and tocell.getColumn() <= Map.SIZE_CITY:
-            if fromcell.getRow() <= Map.SIZE_CITY or fromcell.getColumn() > Map.SIZE_CITY:
-                print("Cambio a ciudad 3")
-                city = 3
-        elif tocell.getRow() > Map.SIZE_CITY and tocell.getColumn() > Map.SIZE_CITY:
-            if fromcell.getRow() <= Map.SIZE_CITY or fromcell.getColumn() <= Map.SIZE_CITY:
-                print("Cambio a ciudad 4")
-                city = 4
-        # si city = 0 significa que no cambia de ciudad
-        return city
+class ConnPlayer(Player):
+    def __init__(self, conn, alias, password):
+        self.conn = conn
+        self.ready = False
+        super().__init__(alias, password)
 
+    def is_user_correct_login_db(player):
+        res = rundb(FDATA_DB,
+            """
+            SELECT password
+            FROM players
+            WHERE alias = ?
+            """
+            ,(player.alias,)
+        )
+        user_fetch = res.fetchone()
+        return user_fetch is not None and user_fetch[0] == player.password
+
+PRINT_USERS_JOIN = "Usuarios unidos: {0}/{1}"
+PRINT_USERS_READY = "Usuarios listos: {0}/{1}"
+
+def handle_player_join(conn, direcc, server, players):
+    player = ConnPlayer(conn, *server.recv_obj())
+
+    if not ConnPlayer.is_user_correct_login_db(player):
+        server.send_msg(MSGERRJOIN_NOT_EXISTS)
+        conn.close()
+        return
+
+    if any(map(lambda p: p.alias == player.alias, players)):
+        server.send_msg(MSGERRJOIN_ALREADY_JOINED)
+        conn.close()
+        return
+
+    players.add(player)
+    server.send_msg(MSGREJOIN)
+    print_count(PRINT_USERS_JOIN, (len(players), MAX_PLAYERS), 1)
+    users_ready = {p for p in players if p.ready}
+    print_count(PRINT_USERS_READY, (len(users_ready), len(players)), 0)
+
+    server.recv_msg()   #Ready
+    player.ready = True
+    users_ready = {p for p in players if p.ready}
+    print_count(PRINT_USERS_JOIN, (len(users_ready), len(players)), 0)
+
+    if len(users_ready) == len(players):
+        server.close()
+
+#==================================================
+
+def start_game(players):
+    pass
+
+"""
 #Local test
 if __name__ == "__main__":
     game = Game()
-    '''
-    game.newPlayer("J", Cell(4,19))
+    player1 = Player("J", "asdf")
+    player2 = Player("V", "asdf")
+    game.newRandPlayer(player1)
+    game.newRandPlayer(player2)
     print(game)
-    game.move("J", Cell(4,19), Direction.S)
+    game.move("J", Direction.S)
+    game.move("V", Direction.N)
+    player1.upLevel()
+    print(player1.getTotalLevel())
     print(game)
-    '''
+"""
 
+#==================================================
 
+while True:
+    if input("Crear partida? (s/): ") not in ("s","S","y","Y"):
+        continue
 
+    print("Esperando jugadores...")
+
+    with MySocket("TCP", ADDR) as server:
+        print_count(PRINT_USERS_JOIN, (0, MAX_PLAYERS), -1)
+        print_count(PRINT_USERS_READY, (0, 0), -1)
+        players = set()
+
+        while True:
+            try:
+                conn, direcc = server.accept()
+                threading.Thread(
+                    target=handle_player_join,
+                    args=(conn, direcc, server, players),
+                    name=direcc[0],
+                    daemon=True
+                ).start()
+            except socket.error:
+                break
+
+        start_game(players)
