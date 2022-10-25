@@ -23,6 +23,9 @@ class MySocket(socket.socket):
         return conn, client
 
     def close(self):
+        for conn in self.conn.values():
+            if conn != self:
+                conn.close()
         self.conn, self.client = None, None
         super().close()
 
