@@ -23,10 +23,10 @@ class Requests():
         cities = set()
         while(len(cities) < 4):
             with MySocket("TCP", ADDR__AA_WEATHER) as client:
-                citie = client.recv_obj()
-                if citie["city"] not in cities:
-                    cities.add(citie["city"])
-                    yield citie
+                city = client.recv_obj()
+                if city["city"] not in cities:
+                    cities.add(city["city"])
+                    yield city
 
 
 class Player():
@@ -289,13 +289,21 @@ def handle_player_join(conn, direcc, server, players):
     users_ready = {p for p in players if p.ready}
     print_count(PRINT_USERS_JOIN, (len(users_ready), len(players)), 0)
 
-    if len(users_ready) == len(players):
+    if len(users_ready) == len(players) >= 2:
         server.close()
 
 #==================================================
 
 def start_game(players):
-    pass
+    game = Game()
+
+    for player in players:
+        game.newRandPlayer(player)
+
+    print("Empieza el juego!\n")
+    print(game)
+    #full kafka
+
 
 """
 #Local test
@@ -336,6 +344,10 @@ while True:
                     daemon=True
                 ).start()
             except socket.error:
+                """
+                Last player to accept closes the server
+                accept() that was waiting gives an error
+                """
                 break
 
         start_game(players)
