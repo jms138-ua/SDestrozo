@@ -5,7 +5,6 @@ import random
 from pygame.locals import *
 import time
 from random import randrange
-import AA_Engine
 from common_utils import MySocket
 
 SIZE_MAP = 20
@@ -24,10 +23,11 @@ BLUE=(0, 0, 255)
 YELLOW=(255, 255, 0)
 
 ADDR = ("localhost", int(sys.argv[1])) # de registry
+ADDR_E = ("localhost", int(sys.argv[2])) # de engine
 
-# puerto engine: 1234
-# weather 9999
-# registry: 5000
+# puerto engine: 4800
+# weather 9000
+# registry: 3200
 
 pygame.init()
 COLOR_INACTIVE = pygame.Color('white')
@@ -149,7 +149,7 @@ def landingPage():
     pygame.draw.rect(screen, 'yellow', rect3, 2)
 
     rect4 = pygame.Rect(280, 550, 170, 32)
-    txt_surface = FONT.render(' Iniciar partida', True, 'white')
+    txt_surface = FONT.render(' Iniciar sesión', True, 'white')
     screen.blit(txt_surface, (280+5, 550+5))
     pygame.draw.rect(screen, 'yellow', rect4, 2)
 
@@ -197,9 +197,9 @@ if __name__=="__main__":
     x = random.randint(0, 19)
     y = random.randint(0, 19)
 
-    game = AA_Engine.Game()
+    # game = AA_Engine.Game()
     player = None
-    fromcell = AA_Engine.Cell(x,y)
+    # fromcell = AA_Engine.Cell(x,y)
 
     # npc de prueba para testear el fight, falta una interacción
     # npc = game.newPlayer("NPC", AA_Engine.Cell(4, 4))
@@ -213,8 +213,10 @@ if __name__=="__main__":
 
     clock = pygame.time.Clock()
 
-    width = game.map.SIZE*(TAM+MARGEN) + MARGEN
-    height = MARGEN_INFERIOR + game.map.SIZE*(TAM+MARGEN) + MARGEN
+    width = 705
+    height = 765
+    # width = game.map.SIZE*(TAM+MARGEN) + MARGEN
+    # height = MARGEN_INFERIOR + game.map.SIZE*(TAM+MARGEN) + MARGEN
     dimension = [width, height]
     screen=pygame.display.set_mode(dimension)
     pygame.display.set_caption("SDestrozo")
@@ -248,7 +250,7 @@ if __name__=="__main__":
     while running:
         if option  == 0:
             running, option = landingPage()
-        elif option == 1 or option == 3:
+        elif option == 1 or option == 3 or option == 4:
             login = False
             already_here = False
             input_boxes_a[0].done = False
@@ -273,6 +275,8 @@ if __name__=="__main__":
                     txt_surface = FONT.render('Crear', True, 'orange')
                 elif option == 3:
                    txt_surface = FONT.render('Borrar', True, 'red')
+                elif option == 4:
+                   txt_surface = FONT.render('Jugar', True, 'yellow')
 
                 screen.blit(txt_surface, (310+5, 500+5))
                 pygame.draw.rect(screen, 'black', create, 2)
@@ -301,6 +305,22 @@ if __name__=="__main__":
                     passwd = input_boxes_a[1].textcopy
 
                 if user != '' and passwd != '':
+                    if option == 4:
+                        client = MySocket("TCP", ADDR_E)
+                        client.send_obj((user,passwd))
+                        msg = client.recv_msg()
+                        first_chars = msg[0:5]
+                        if first_chars != "Error":
+                            login = True
+                            option = 5
+                        else:
+                            option = 0
+                        already_here = True
+                        txt_msg = FONT.render(msg, True, 'yellow')
+                        screen.blit(txt_msg, (20, 600))
+                        pygame.display.update()
+                        client.close()
+                        time.sleep(2)
                     if already_here == False:
                         with MySocket("TCP", ADDR) as client:
                             if option == 1:
@@ -419,11 +439,26 @@ if __name__=="__main__":
             pygame.display.flip()
             clock.tick(20)
 
-        elif option == 4:
-            login = False
+        elif option == 5:
+            screen.fill(BLACK)
+
+            rect1 = pygame.Rect(300, 60, 170, 28)
+            txt_surface = FONT.render('Mapear', True, 'white')
+            screen.blit(txt_surface, (300, 65))
+            pygame.draw.rect(screen, 'black', rect1, 2)
+
+            pygame.display.update()
+        '''
+        login = False
             already_here = False
             input_boxes_c[0].done = False
             input_boxes_c[1].done = False
+
+            # client.send_obj(us,con)
+            # client.recv_msg
+            # client.send_msg("ready")
+            # nueva pestaña: iniciar sesión -> si ready vas al mapa. nada de no ready
+
             if login == False:
                 fuente= pygame.font.Font(None, 30)
                 texto= fuente.render("", True, BLACK)
@@ -445,7 +480,6 @@ if __name__=="__main__":
                 if user != '' and passwd != '':
                     if already_here == False:
                         with MySocket("TCP", ADDR) as client:
-                            print("bbbbb")
                             client.send_msg("Create")
                             client.send_obj((user,passwd))
                             print(client.recv_msg())
@@ -469,7 +503,7 @@ if __name__=="__main__":
                 for event in pygame.event.get():
                     if event.type == pygame.QUIT:
                         running = False
-                    if event.type == pygame.KEYDOWN:
+                    elif event.type == pygame.KEYDOWN:
                         if event.key == pygame.K_LEFT:
                             checkField(player, fromcell + AA_Engine.Direction.N)
                             game.move(player.getAlias(), fromcell, AA_Engine.Direction.N)
@@ -491,6 +525,7 @@ if __name__=="__main__":
             pygame.display.flip()
             clock.tick(40)
             printMap(game)
+        '''
 
     pygame.quit()
     sys.exit()
