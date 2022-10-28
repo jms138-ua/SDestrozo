@@ -1,7 +1,20 @@
-from socket import socket
+"""
+client.send_obj(("user","password"))
+client.recv_msg() -> MSGOPRE
+client.send_msg("Ready")
+client.with_kafka.recv() -> "None": Initial Map
+thread1:
+    while movement:
+        client.with_kafka.send("alias":"direction")
+thread2:
+    while any player movement:
+        client.with_kafka.recv() -> "alias": Map
+"""
+
 from common_utils import socket, MySocket, rundb
 
-import sys, threading, time, random
+from kafka import KafkaConsumer, KafkaProducer
+import sys, threading, pickle, random
 
 
 ADDR = ("", int(sys.argv[1]))
@@ -72,6 +85,9 @@ class Direction():
     SW = (-1,1)
     SE = (1,1)
 
+    def fromStr(text):
+        return vars(Direction)[text]
+
 
 class Cell():
     MINE = "M"
@@ -90,8 +106,8 @@ class Cell():
     def __eq__(self, other):
         return self.column == other.getColumn() and self.row == other.getRow()
 
-    def __add__(self, direc):
-        return Cell(self.column+direc[0], self.row+direc[1])
+    def __add__(self, direcc):
+        return Cell(self.column+direcc[0], self.row+direcc[1])
 
     def getColumn(self):
         return self.column
@@ -183,6 +199,15 @@ class Game():
             strgame += str(player) + "\n"
         return strgame
 
+    def getMap(self):
+        return self.map.getMap()
+
+    def getPlayers(self):
+        return self.players
+
+    def isended(self):
+        return len(self.players) == 1
+
     def updatePlayer(self, player, pos):
         player.pos = pos
         player.temperature = Map.getCity(self.cities, pos)["temperature"]
@@ -199,9 +224,9 @@ class Game():
                 self.map.setValueCell(pos, player.alias)
                 break
 
-    def move(self, playeralias, direc):
+    def move(self, playeralias, direcc):
         player = self.players[playeralias]
-        topos = (player.pos + direc)
+        topos = (player.pos + direcc)
         topos.normalize(Map.SIZE,Map.SIZE)
         self.update(player, topos)
 
@@ -302,24 +327,32 @@ def start_game(players):
 
     print("Empieza el juego!\n")
     print(game)
-    #full kafka
 
+    producer = KafkaProducer(
+        bootstrap_servers=["localhost:29092"],
+        value_serializer=lambda v: pickle.dumps(v)
+    )
 
-"""
-#Local test
-if __name__ == "__main__":
-    game = Game()
-    player1 = Player("J", "asdf")
-    player2 = Player("V", "asdf")
-    game.newRandPlayer(player1)
-    game.newRandPlayer(player2)
-    print(game)
-    game.move("J", Direction.S)
-    game.move("V", Direction.N)
-    player1.upLevel()
-    print(player1.getTotalLevel())
-    print(game)
-"""
+    consumer = KafkaConsumer(
+        "movement",
+        group_id = "engine",
+        bootstrap_servers = ["localhost:29092"],
+        auto_offset_reset = "earliest",
+        enable_auto_commit = True,
+        value_deserializer = lambda v: pickle.loads(v)
+    )
+
+    producer.send("map", value={"None":game.getMap()})
+
+    for msg in consumer:
+        playeralias, direcc = msg.value.items()
+        game.move(playeralias, Direction.fromStr(direcc))
+        producer.send("map", value={playeralias:game.getMap()})
+
+        if game.isended():
+            print("La partida ha terminado")
+            print("Ha ganado el jugador", game.getPlayers()[0])
+            break
 
 #==================================================
 
