@@ -27,6 +27,7 @@ MAX_PLAYERS = int(sys.argv[2])
 MSGREJOIN = "Usuario unido a la partida"
 MSGERRJOIN_NOT_EXISTS = "Error. La cuenta no coincide con ninguna registrada"
 MSGERRJOIN_ALREADY_JOINED = "Error. Usuario ya unido a la partida"
+MSGERRJOIN_MAX_PLAYERS = "Error. Maximo de usuarios permitidos en la partida"
 
 
 class Requests():
@@ -290,7 +291,7 @@ class ConnPlayer(Player):
 PRINT_USERS_JOIN = "Usuarios unidos: {0}/{1}"
 PRINT_USERS_READY = "Usuarios listos: {0}/{1}"
 
-def handle_player_join(conn, direcc, server, players):
+def handle_player_join(conn, server, players):
     player = ConnPlayer(conn, *server.recv_obj())
 
     if not ConnPlayer.is_user_correct_login_db(player):
@@ -300,6 +301,20 @@ def handle_player_join(conn, direcc, server, players):
 
     if any(map(lambda p: p.alias == player.alias, players)):
         server.send_msg(MSGERRJOIN_ALREADY_JOINED)
+        conn.close()
+        return
+
+    """
+    Two players can join at the same time,
+    and the first reaches the MAX_PLAYERS
+    with an exception in the second.
+
+    Is discarded by almost null probability
+    and does not affect the system
+    (can be controlled in the user)
+    """
+    if len(players) == MAX_PLAYERS:
+        server.send_msg(MSGERRJOIN_MAX_PLAYERS)
         conn.close()
         return
 
