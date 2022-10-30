@@ -291,7 +291,7 @@ class ConnPlayer(Player):
 PRINT_USERS_JOIN = "Usuarios unidos: {0}/{1}"
 PRINT_USERS_READY = "Usuarios listos: {0}/{1}"
 
-def handle_player_join(conn, server, players):
+def handle_player_join(conn, direcc, server, players):
     player = ConnPlayer(conn, *server.recv_obj())
 
     if not ConnPlayer.is_user_correct_login_db(player):
