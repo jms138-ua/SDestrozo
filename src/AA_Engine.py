@@ -135,9 +135,9 @@ class Map():
 
     def __str__(self):
         strmap = ""
-        for j, row in enumerate(self.map):
+        for row in self.map:
             strmap += "|"
-            for i, value in enumerate(row):
+            for value in row:
                 strmap += str(value)
                 strmap += "|"
             strmap += "\n"
@@ -160,6 +160,9 @@ class Map():
 
     def delValueCell(self, cell, value):
         self.map[cell.getRow()-1][cell.getColumn()-1].remove(value)
+
+    def newEmptyMap():
+        return [[" " for _ in range(Map.SIZE)] for _ in range(Map.SIZE)]
 
     def newRandMap():
         map = []
@@ -201,7 +204,14 @@ class Game():
         return strgame
 
     def getMap(self):
-        return self.map.getMap()
+        maptosend = Map.newEmptyMap()
+        for j, row in enumerate(self.map.getMap()):
+            for i, value in enumerate(row):
+                if type(value) is list:
+                    maptosend[j][i] = [(player, self.players[player].getTotalLevel()) for player in value]
+                else:
+                    maptosend[j][i] = value
+        return maptosend
 
     def getPlayers(self):
         return self.players
@@ -251,7 +261,7 @@ class Game():
 
     def fight(self, player1):
         for player2 in self.players.values():
-            if player2.pos == player.pos and player.getTotalLevel() != player2.getTotalLevel():
+            if player2.pos == player.pos and player1.getTotalLevel() != player2.getTotalLevel():
                 playertodel = max(player1, player2, key=lambda player: player.getTotalLevel())
                 self.map.delValueCell(playertodel.pos, playertodel.alias)
                 self.players.pop(playertodel.alias)
