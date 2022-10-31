@@ -25,9 +25,14 @@ YELLOW=(255, 255, 0)
 ADDR = ("localhost", int(sys.argv[1])) # de registry
 ADDR_E = ("localhost", int(sys.argv[2])) # de engine
 
-# puerto engine: 4800
-# weather 9000
-# registry: 3200
+# puerto engine: 1236
+# weather 1234
+# registry: 1235
+
+# python3 AA_Weather.py 1234
+# python3 AA_Registry.py 1235
+# python3 AA_Engine.py 1236 9 1234
+# python3 AA_Player.py 1235 1236
 
 pygame.init()
 COLOR_INACTIVE = pygame.Color('white')
@@ -192,6 +197,37 @@ def printMap(map):
             else:
                 pygame.draw.rect(screen, BLUE, [(TAM+MARGEN)*col+MARGEN, (TAM+MARGEN)*fil+MARGEN, TAM, TAM], 0)
 
+def printEmpty():
+    for fil in range(20):
+        for col in range(20):
+            pygame.draw.rect(screen, WHITE, [(TAM+MARGEN)*col+MARGEN, (TAM+MARGEN)*fil+MARGEN, TAM, TAM], 0)
+
+def getReady(client, ready, ready_times, running):
+    btn_ready = pygame.Rect(300, 730, 170, 32)
+    screen.fill(BLACK)
+    printEmpty()
+
+    if ready == False:
+        txt_surface = FONT.render('Todo listo', True, 'blue')
+        screen.blit(txt_surface, (300, 730))
+        pygame.draw.rect(screen, 'black', btn_ready, 2)
+
+    if ready == True and ready_times < 2:
+        ready_times = ready_times + 1
+        client.send_msg("Ready")
+
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
+        elif event.type == pygame.MOUSEBUTTONDOWN:
+            if btn_ready.collidepoint(event.pos) and ready == False:
+                ready = True
+                ready_times = ready_times + 1
+
+    pygame.display.update()
+
+    return ready, client, running
+
 if __name__=="__main__":
 
     x = random.randint(0, 19)
@@ -244,8 +280,12 @@ if __name__=="__main__":
     login = False
     created = False
     option = 0
+    usr_login = ""
+    passwd_login = ""
     already_here = False
     msg = ''
+    ready = False
+    ready_times = 0
 
     while running:
         if option  == 0:
@@ -281,7 +321,7 @@ if __name__=="__main__":
                 screen.blit(txt_surface, (310+5, 500+5))
                 pygame.draw.rect(screen, 'black', create, 2)
 
-                txt_msg = FONT.render("", True, 'yellow')
+                txt_msg = FONT.render('', True, 'yellow')
                 screen.blit(txt_msg, (280+5, 600+5))
 
                 pygame.display.update()
@@ -306,45 +346,53 @@ if __name__=="__main__":
 
                 if user != '' and passwd != '':
                     if option == 4:
-                        client = MySocket("TCP", ADDR_E)
-                        client.send_obj((user,passwd))
-                        msg = client.recv_msg()
+                        client1 = MySocket("TCP", ADDR_E)
+                        client1.send_obj((user,passwd))
+                        msg = client1.recv_msg()
+                        print(msg)
                         first_chars = msg[0:5]
                         if first_chars != "Error":
                             login = True
-                            option = 5
+                            while login == True and running == True:
+                                ready, client1, running = getReady(client1, ready, ready_times, running)
+                            if running == False:
+                                client1.close()
+                                pygame.quit()
+                                sys.exit()
+                            usr_login = user
+                            passwd_login = passwd
                         else:
                             option = 0
                         already_here = True
                         txt_msg = FONT.render(msg, True, 'yellow')
                         screen.blit(txt_msg, (20, 600))
                         pygame.display.update()
-                        client.close()
                         time.sleep(2)
                     if already_here == False:
-                        with MySocket("TCP", ADDR) as client:
-                            if option == 1:
-                                client.send_msg("Create")
-                                client.send_obj((user,passwd))
-                                msg = client.recv_msg()
-                                already_here = True
-                                login = True
-                                option = 0
-                                txt_msg = FONT.render(msg, True, 'yellow')
-                                screen.blit(txt_msg, (20, 600))
-                                pygame.display.update()
-                                time.sleep(2)
-                            elif option == 3:
-                                client.send_msg("Delete")
-                                client.send_obj((user,passwd))
-                                msg = client.recv_msg()
-                                already_here = True
-                                login = False
-                                option = 0
-                                txt_msg = FONT.render(msg, True, 'yellow')
-                                screen.blit(txt_msg, (20, 600))
-                                pygame.display.update()
-                                time.sleep(2)
+                        client2 = MySocket("TCP", ADDR)
+                        if option == 1:
+                            client2.send_msg("Create")
+                            client2.send_obj((user,passwd))
+                            msg = client2.recv_msg()
+                            already_here = True
+                            login = True
+                            option = 0
+                            txt_msg = FONT.render(msg, True, 'yellow')
+                            screen.blit(txt_msg, (20, 600))
+                            pygame.display.update()
+                            time.sleep(2)
+                        elif option == 3:
+                            client2.send_msg("Delete")
+                            client2.send_obj((user,passwd))
+                            msg = client2.recv_msg()
+                            already_here = True
+                            login = False
+                            option = 0
+                            txt_msg = FONT.render(msg, True, 'yellow')
+                            screen.blit(txt_msg, (20, 600))
+                            pygame.display.update()
+                            time.sleep(2)
+                        client2.close()
 
                     user = ''
                     passwd = ''
@@ -418,11 +466,11 @@ if __name__=="__main__":
 
                 if user != '' and passwd != '' and newuser != '' and newpasswd != '':
                     if already_here == False:
-                        with MySocket("TCP", ADDR) as client:
-                            client.send_msg("Update")
-                            client.send_obj((user,passwd))
-                            client.send_obj((newuser,newpasswd))
-                            msg = client.recv_msg()
+                        with MySocket("TCP", ADDR) as client3:
+                            client3.send_msg("Update")
+                            client3.send_obj((user,passwd))
+                            client3.send_obj((newuser,newpasswd))
+                            msg = client3.recv_msg()
                             already_here = True
                             login = True
                             option = 0
@@ -440,14 +488,8 @@ if __name__=="__main__":
             clock.tick(20)
 
         elif option == 5:
-            screen.fill(BLACK)
+            pass
 
-            rect1 = pygame.Rect(300, 60, 170, 28)
-            txt_surface = FONT.render('Mapear', True, 'white')
-            screen.blit(txt_surface, (300, 65))
-            pygame.draw.rect(screen, 'black', rect1, 2)
-
-            pygame.display.update()
         '''
         login = False
             already_here = False
