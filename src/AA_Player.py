@@ -1,11 +1,13 @@
-import sys
+from http import client
+import sys, threading, pickle
 import pygame
-import math
 import random
 from pygame.locals import *
 import time
+from threading import Thread
 from random import randrange
 from common_utils import MySocket
+from kafka import KafkaConsumer, KafkaProducer
 
 SIZE_MAP = 20
 SIZE_CITY = SIZE_MAP / 2
@@ -21,6 +23,10 @@ GREEN=(0, 255,0)
 RED=(255, 0, 0)
 BLUE=(0, 0, 255)
 YELLOW=(255, 255, 0)
+CITY1=(179,230,181)
+CITY2=(173,216,230)
+CITY3=(255,255,224)
+CITY4=(235,236,240)
 
 ADDR = ("localhost", int(sys.argv[1])) # de registry
 ADDR_E = ("localhost", int(sys.argv[2])) # de engine
@@ -120,7 +126,6 @@ def checkField(player, cell):
     if game.checkPosition(cell) == AA_Engine.Cell.FOOD:
         screen.fill(GREEN)
         screen.blit(you_win, (230,330))
-
         pygame.display.update()
         time.sleep(2)
         pygame.quit()
@@ -200,7 +205,14 @@ def printMap(map):
 def printEmpty():
     for fil in range(20):
         for col in range(20):
-            pygame.draw.rect(screen, WHITE, [(TAM+MARGEN)*col+MARGEN, (TAM+MARGEN)*fil+MARGEN, TAM, TAM], 0)
+            if fil < 10 and col < 10:
+                pygame.draw.rect(screen, CITY1, [(TAM+MARGEN)*col+MARGEN, (TAM+MARGEN)*fil+MARGEN, TAM, TAM], 0)
+            elif fil < 10 and col >= 10:
+                pygame.draw.rect(screen, CITY2, [(TAM+MARGEN)*col+MARGEN, (TAM+MARGEN)*fil+MARGEN, TAM, TAM], 0)
+            elif fil >= 10 and col < 10:
+                pygame.draw.rect(screen, CITY3, [(TAM+MARGEN)*col+MARGEN, (TAM+MARGEN)*fil+MARGEN, TAM, TAM], 0)
+            else:
+                pygame.draw.rect(screen, CITY4, [(TAM+MARGEN)*col+MARGEN, (TAM+MARGEN)*fil+MARGEN, TAM, TAM], 0)
 
 def getReady(client, ready, ready_times, running):
     btn_ready = pygame.Rect(300, 730, 170, 32)
@@ -226,7 +238,20 @@ def getReady(client, ready, ready_times, running):
 
     pygame.display.update()
 
-    return ready, client, running
+    return ready, client, running, ready_times
+
+def startMatch(client, running, user):
+
+    #aquí vive kafka
+    screen.fill(BLACK)
+    rect1 = pygame.Rect(300, 100, 170, 28)
+    txt_surface = FONT.render('Usuario', True, 'white')
+    screen.blit(txt_surface, (300, 100))
+    pygame.draw.rect(screen, 'black', rect1, 2)
+
+    pygame.display.update()
+
+    return running
 
 if __name__=="__main__":
 
@@ -353,8 +378,10 @@ if __name__=="__main__":
                         first_chars = msg[0:5]
                         if first_chars != "Error":
                             login = True
-                            while login == True and running == True:
-                                ready, client1, running = getReady(client1, ready, ready_times, running)
+                            while login == True and running == True and ready_times < 2:
+                                ready, client1, running, ready_times = getReady(client1, ready, ready_times, running)
+                            while ready == True and running == True:
+                                running = startMatch(client1, running, user)
                             if running == False:
                                 client1.close()
                                 pygame.quit()
@@ -495,30 +522,24 @@ if __name__=="__main__":
             already_here = False
             input_boxes_c[0].done = False
             input_boxes_c[1].done = False
-
             # client.send_obj(us,con)
             # client.recv_msg
             # client.send_msg("ready")
             # nueva pestaña: iniciar sesión -> si ready vas al mapa. nada de no ready
-
             if login == False:
                 fuente= pygame.font.Font(None, 30)
                 texto= fuente.render("", True, BLACK)
                 screen.blit(texto, [width-120, AA_Engine.Map.SIZE*(TAM+MARGEN)+MARGEN+15])
-
                 pygame.display.update()
-
                 for event in pygame.event.get():
                     if event.type == pygame.QUIT:
                         running = False
                     for box in input_boxes_c:
                         box.handle_event(event)
-
                 if input_boxes_c[0].done == True:
                     user = input_boxes_c[0].textcopy
                 if input_boxes_c[1].done == True:
                     passwd = input_boxes_c[1].textcopy
-
                 if user != '' and passwd != '':
                     if already_here == False:
                         with MySocket("TCP", ADDR) as client:
@@ -527,21 +548,16 @@ if __name__=="__main__":
                             print(client.recv_msg())
                             already_here = True
                             login = True
-
                 for box in input_boxes_c:
                     box.update()
                     box.draw(screen, login)
-
             if login == True:
-
                 if created == False:
                     player = game.newPlayer(input_boxes_c[0].textcopy, AA_Engine.Cell(x, y))
                     created = True
-
                 fuente= pygame.font.Font(None, 30)
                 texto= fuente.render("Nivel: "+str(player.getLevel()), True, YELLOW)
                 screen.blit(texto, [width-120, AA_Engine.Map.SIZE*(TAM+MARGEN)+MARGEN+15])
-
                 for event in pygame.event.get():
                     if event.type == pygame.QUIT:
                         running = False
@@ -563,7 +579,6 @@ if __name__=="__main__":
                             game.move(player.getAlias(), fromcell, AA_Engine.Direction.E)
                             fromcell = fromcell + AA_Engine.Direction.E
                         fromcell.normalize(game.map.SIZE, game.map.SIZE)
-
             pygame.display.flip()
             clock.tick(40)
             printMap(game)
