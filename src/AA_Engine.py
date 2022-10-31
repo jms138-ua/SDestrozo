@@ -327,7 +327,7 @@ def handle_player_join(conn, direcc, server, players):
     server.recv_msg()   #Ready
     player.ready = True
     users_ready = {p for p in players if p.ready}
-    print_count(PRINT_USERS_JOIN, (len(users_ready), len(players)), 0)
+    print_count(PRINT_USERS_READY, (len(users_ready), len(players)), 0)
 
     if len(users_ready) == len(players) >= 2:
         server.close()
@@ -378,6 +378,8 @@ while True:
     print("Esperando jugadores...")
 
     with MySocket("TCP", ADDR) as server:
+        server.settimeout(0.1)  #Any time
+
         print_count(PRINT_USERS_JOIN, (0, MAX_PLAYERS), -1)
         print_count(PRINT_USERS_READY, (0, 0), -1)
         players = set()
@@ -391,6 +393,13 @@ while True:
                     name=direcc[0],
                     daemon=True
                 ).start()
+            except socket.timeout:
+                """
+                Linux fun:
+                accept(), if is running, not gives an error if the server is closed
+                settimeout and handle the exception to repeat the accept()
+                """
+                continue
             except socket.error:
                 """
                 Last player to accept closes the server
