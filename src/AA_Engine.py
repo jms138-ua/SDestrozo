@@ -261,7 +261,7 @@ class Game():
 
     def fight(self, player1):
         for player2 in self.players.values():
-            if player2.pos == player.pos and player1.getTotalLevel() != player2.getTotalLevel():
+            if player2.pos == player1.pos and player1.getTotalLevel() != player2.getTotalLevel():
                 playertodel = max(player1, player2, key=lambda player: player.getTotalLevel())
                 self.map.delValueCell(playertodel.pos, playertodel.alias)
                 self.players.pop(playertodel.alias)
