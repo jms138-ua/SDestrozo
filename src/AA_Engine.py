@@ -370,13 +370,13 @@ def start_game(players):
     producer.send("map", value={"None":game.getMap()})
 
     for msg in consumer:
-        playeralias, direcc = msg.value.items()
+        playeralias, direcc = list(msg.value.items())[0]
         game.move(playeralias, Direction.fromStr(direcc))
         producer.send("map", value={playeralias:game.getMap()})
 
         if game.isended():
             print("La partida ha terminado")
-            print("Ha ganado el jugador", game.getPlayers()[0])
+            print("Ha ganado el jugador", list(game.getPlayers())[0])
             break
 
 #==================================================
@@ -417,4 +417,4 @@ while True:
                 """
                 break
 
-        start_game(players)
+    start_game(players)
