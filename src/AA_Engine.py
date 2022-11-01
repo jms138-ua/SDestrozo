@@ -107,8 +107,8 @@ class Cell():
     def __eq__(self, other):
         return self.column == other.getColumn() and self.row == other.getRow()
 
-    def __add__(self, direcc):
-        return Cell(self.column+direcc[0], self.row+direcc[1])
+    def __add__(self, direc):
+        return Cell(self.column+direc[0], self.row+direc[1])
 
     def getColumn(self):
         return self.column
@@ -235,9 +235,9 @@ class Game():
                 self.map.setValueCell(pos, player.alias)
                 break
 
-    def move(self, playeralias, direcc):
+    def move(self, playeralias, direc):
         player = self.players[playeralias]
-        topos = (player.pos + direcc)
+        topos = (player.pos + direc)
         topos.normalize(Map.SIZE,Map.SIZE)
         self.update(player, topos)
 
@@ -301,7 +301,7 @@ class ConnPlayer(Player):
 PRINT_USERS_JOIN = "Usuarios unidos: {0}/{1}"
 PRINT_USERS_READY = "Usuarios listos: {0}/{1}"
 
-def handle_player_join(conn, direcc, server, players):
+def handle_player_join(conn, addr, server, players):
     player = ConnPlayer(conn, *server.recv_obj())
 
     if not ConnPlayer.is_user_correct_login_db(player):
@@ -370,8 +370,9 @@ def start_game(players):
     producer.send("map", value={"None":game.getMap()})
 
     for msg in consumer:
-        playeralias, direcc = list(msg.value.items())[0]
-        game.move(playeralias, Direction.fromStr(direcc))
+        playeralias, direc = list(msg.value.items())[0]
+        print(playeralias, "se mueve en la direcion", direc)
+        game.move(playeralias, Direction.fromStr(direc))
         producer.send("map", value={playeralias:game.getMap()})
 
         if game.isended():
@@ -396,11 +397,11 @@ while True:
 
         while True:
             try:
-                conn, direcc = server.accept()
+                conn, addr = server.accept()
                 threading.Thread(
                     target=handle_player_join,
-                    args=(conn, direcc, server, players),
-                    name=direcc[0],
+                    args=(conn, addr, server, players),
+                    name=direc[0],
                     daemon=True
                 ).start()
             except socket.timeout:

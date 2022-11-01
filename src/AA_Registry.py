@@ -120,7 +120,7 @@ with MySocket("TCP", ADDR) as server:
                 else MSGERROP_ALREADY_EXISTS
             )
             if iscreated:
-                print(direcc, "Ha creado el usaurio")
+                print(direcc, "Ha creado el usuario")
 
         elif op == "Update":
             if user_correct_login_db(user):
