@@ -401,7 +401,7 @@ while True:
                 threading.Thread(
                     target=handle_player_join,
                     args=(conn, addr, server, players),
-                    name=direc[0],
+                    name=addr[0],
                     daemon=True
                 ).start()
             except socket.timeout:
