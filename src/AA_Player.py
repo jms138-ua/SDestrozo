@@ -1,4 +1,3 @@
-from http import client
 import sys, threading, pickle
 import pygame
 import random
@@ -189,18 +188,25 @@ def landingPage():
     return running, option
 
 def printMap(map):
-
     screen.fill(BLACK)
-    for fil in range(game.map.SIZE):
-        for col in range(game.map.SIZE):
-            if game.map.getCell(fil, col) == AA_Engine.Cell.MINE:
+    for fil in range(20):
+        for col in range(20):
+            if map[fil][col] == "M":
                 pygame.draw.rect(screen, RED, [(TAM+MARGEN)*col+MARGEN, (TAM+MARGEN)*fil+MARGEN, TAM, TAM], 0)
-            elif game.map.getCell(fil, col) == AA_Engine.Cell.EMPTY:
-                pygame.draw.rect(screen, WHITE, [(TAM+MARGEN)*col+MARGEN, (TAM+MARGEN)*fil+MARGEN, TAM, TAM], 0)
-            elif game.map.getCell(fil, col) == AA_Engine.Cell.FOOD:
+            elif map[fil][col] == " ":
+                if fil < 10 and col < 10:
+                    pygame.draw.rect(screen, CITY1, [(TAM+MARGEN)*col+MARGEN, (TAM+MARGEN)*fil+MARGEN, TAM, TAM], 0)
+                elif fil < 10 and col >= 10:
+                    pygame.draw.rect(screen, CITY2, [(TAM+MARGEN)*col+MARGEN, (TAM+MARGEN)*fil+MARGEN, TAM, TAM], 0)
+                elif fil >= 10 and col < 10:
+                    pygame.draw.rect(screen, CITY3, [(TAM+MARGEN)*col+MARGEN, (TAM+MARGEN)*fil+MARGEN, TAM, TAM], 0)
+                else:
+                    pygame.draw.rect(screen, CITY4, [(TAM+MARGEN)*col+MARGEN, (TAM+MARGEN)*fil+MARGEN, TAM, TAM], 0)
+            elif map[fil][col] == "A":
                 pygame.draw.rect(screen, GREEN, [(TAM+MARGEN)*col+MARGEN, (TAM+MARGEN)*fil+MARGEN, TAM, TAM], 0)
             else:
                 pygame.draw.rect(screen, BLUE, [(TAM+MARGEN)*col+MARGEN, (TAM+MARGEN)*fil+MARGEN, TAM, TAM], 0)
+    pygame.display.update()
 
 def printEmpty():
     for fil in range(20):
@@ -240,18 +246,87 @@ def getReady(client, ready, ready_times, running):
 
     return ready, client, running, ready_times
 
-def startMatch(client, running, user):
+def getDirec(cardinal):
+    tuplita = (0,0)
 
-    #aquí vive kafka
+    if cardinal == "N":
+        tuplita = (0,-1)
+    elif cardinal == "S":
+        tuplita = (0,1)
+    elif cardinal == "W":
+        tuplita = (-1,0)
+    elif cardinal == "E":
+        tuplita = (1,0)
+    elif cardinal == "SE":
+        tuplita = (1,1)
+    elif cardinal == "SW":
+        tuplita = (-1,1)
+    elif cardinal == "NE":
+        tuplita = (1,-1)
+    elif cardinal == "NW":
+        tuplita = (-1,-1)
+    else:
+        tuplita = (0,0)
+
+    return tuplita
+
+def funcrecv(alias):
+    consumer = KafkaConsumer(
+     "map",
+     bootstrap_servers=['localhost:29092'],
+     auto_offset_reset='earliest',
+     enable_auto_commit=True,
+     group_id="aa",
+     value_deserializer = lambda v: pickle.loads(v)
+    )
+
+    producer = KafkaProducer(
+        bootstrap_servers = ["localhost:29092"],
+        value_serializer = lambda v: pickle.dumps(v)
+    )
+
+    #direc=["N","S","W","E","NE","SW","NW","SE"]
+    clock = pygame.time.Clock()
+    i = (0,0)
+    direc = ""
+
+    for msg in consumer:
+        mapa = list(msg.value.values())[0]
+        printMap(mapa)
+        pygame.display.flip()
+        clock.tick(20)
+        event = pygame.event.wait()
+        if event.type == pygame.QUIT:
+            pygame.quit()
+            sys.exit()
+        elif event.type == pygame.KEYDOWN:
+            if direc == "":
+                if event.key == pygame.K_LEFT:
+                    direc = "N"
+                elif event.key == pygame.K_RIGHT:
+                    direc = "S"
+                elif event.key == pygame.K_UP:
+                    direc = "W"
+                elif event.key == pygame.K_DOWN:
+                    direc = "E"
+                else:
+                    direc = "X"
+            #random_idx = random.randint(0,7)
+            i = getDirec(direc)
+        if i != (0,0):
+            data = {alias:i}
+            producer.send('mapa', value=data)
+            print("he enviado un: " + direc)
+        i = (0,0)
+        direc = ""
+
+def startMatch(alias):
     screen.fill(BLACK)
-    rect1 = pygame.Rect(300, 100, 170, 28)
-    txt_surface = FONT.render('Usuario', True, 'white')
-    screen.blit(txt_surface, (300, 100))
-    pygame.draw.rect(screen, 'black', rect1, 2)
-
+    printEmpty()
     pygame.display.update()
 
-    return running
+    funcrecv(alias)
+    time.sleep(10000)
 
 if __name__=="__main__":
 
@@ -309,6 +384,7 @@ if __name__=="__main__":
     passwd_login = ""
     already_here = False
     msg = ''
+    thread = 0
     ready = False
     ready_times = 0
 
@@ -380,8 +456,9 @@ if __name__=="__main__":
                             login = True
                             while login == True and running == True and ready_times < 2:
                                 ready, client1, running, ready_times = getReady(client1, ready, ready_times, running)
-                            while ready == True and running == True:
-                                running = startMatch(client1, running, user)
+                            while ready == True and running == True and thread == 0:
+                                startMatch(user)
+                                thread = thread + 1
                             if running == False:
                                 client1.close()
                                 pygame.quit()
