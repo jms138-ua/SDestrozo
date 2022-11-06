@@ -1,13 +1,8 @@
 """
-client.send_msg("Create"|"Delete")
+client.send_msg("Create"|"Update"|"Delete")
 client.send_obj(("user","password"))
-client.recv_msg() -> MSGOPRE
-
-//////////////////////////////////////////
-
-client.send_msg("Update")
-client.send_obj(("user","password"))
-client.send_obj(("newuser","newpassword"))
+if Update:
+    client.send_obj(("newuser","newpassword"))
 client.recv_msg() -> MSGOPRE
 """
 

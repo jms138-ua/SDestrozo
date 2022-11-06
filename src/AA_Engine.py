@@ -1,5 +1,9 @@
 """
-client.send_obj(("user","password"))
+args: <port> <maxplayers> <AA_Weather-ip>:<AA_Weather-port>
+
+client.send_msg("Player"|"NPC")
+if Player:
+    client.send_obj(("user","password"))
 client.recv_msg() -> MSGOPRE
 client.send_msg("Ready")
 client.with_kafka.recv() -> "None": Initial Map
@@ -19,6 +23,8 @@ import sys, threading, pickle, random
 
 ADDR = ("", int(sys.argv[1]))
 ADDR__AA_WEATHER = ("localhost", int(sys.argv[3]))
+
+ADDR__AA_WEATHER = (sys.argv[3].split(":")[0], int(sys.argv[3].split(":")[1]))
 
 FDATA_DB = "../data/db.db"
 
@@ -44,17 +50,9 @@ class Requests():
 
 
 class Player():
-    def __init__(self, alias, password):
-        self.alias = alias
-        self.password = password
+    def __init__(self, level):
         self.pos = Cell(-1, -1)
-        self.ef = random.randint(-10,10)
-        self.ec = random.randint(-10,10)
-        self.__level = 1
-        self.temperature = None
-
-    def __str__(self):
-        return "Usuario " + self.alias + ", con nivel " + str(self.getTotalLevel())
+        self.__level = level
 
     def isAlive(self):
         return self.__level != -1
@@ -63,17 +61,44 @@ class Player():
         self.__level = -1
 
     def upLevel(self):
+        pass
+
+    def getTotalLevel(self):
+        return self.__level
+
+
+class HumanPlayer(Player):
+    def __init__(self, alias, password):
+        self.alias = alias
+        self.password = password
+        super().__init__(self, level=1)
+        self.ef = random.randint(-10,10)
+        self.ec = random.randint(-10,10)
+        self.temperature = None
+
+    def __str__(self):
+        return "Jugador " + self.alias + " con nivel " + str(self.getTotalLevel())
+
+    def upLevel(self):
         self.__level += 1
 
     def getTotalLevel(self):
         if self.temperature is None:
             return self.__level
         elif self.temperature <= 10:
-            return self.__level + self.ef
+            return max(0, self.__level + self.ef)
         elif self.temperature >= 25:
-            return self.__level + self.ec
+            return max(0, self.__level + self.ec)
         else:
             return self.__level
+
+
+class NPC(Player):
+    def __init__(self):
+        super().__init__(level=random.randint(0,25))
+
+    def __str__(self):
+        return "NPC con nivel " + str(self.getTotalLevel())
 
 
 class Direction():
@@ -217,7 +242,10 @@ class Game():
         return self.players
 
     def isended(self):
-        return len(self.players) == 1
+        for player in self.players:
+            if isinstance(player, Player):
+                return len(self.players) == 1
+        return True
 
     def updatePlayer(self, player, pos):
         player.pos = pos
@@ -252,9 +280,10 @@ class Game():
             self.map.setValueCell(topos, player.alias)
             player.upLevel()
         elif value == Cell.MINE:
-            self.map.setCell(topos, Cell.EMPTY)
-            self.players.pop(player.alias)
-            player.die()
+            if not isinstance(player, NPC):
+                self.map.setCell(topos, Cell.EMPTY)
+                self.players.pop(player.alias)
+                player.die()
         else:
             self.map.setValueCell(topos, player.alias)
             self.fight(player)
@@ -269,22 +298,11 @@ class Game():
 
 #==================================================
 
-def print_count(text, textargs, nreverselines):
-    if nreverselines == -1:
-        sys.stdout.write(text.format(*textargs))
-        sys.stdout.write("\n")
-    else:
-        sys.stdout.write("\033[{n}A".format(n=nreverselines+1))
-        sys.stdout.write(text.format(*textargs))
-        sys.stdout.write("\033[{n}B".format(n=nreverselines+1))
-        sys.stdout.write("\033[0G")
-    sys.stdout.flush()
-
-class ConnPlayer(Player):
+class ConnHumanPlayer(HumanPlayer):
     def __init__(self, conn, alias, password):
         self.conn = conn
         self.ready = False
-        super().__init__(alias, password)
+        super().__init__(self, alias, password)
 
     def is_user_correct_login_db(player):
         res = rundb(FDATA_DB,
@@ -298,26 +316,50 @@ class ConnPlayer(Player):
         user_fetch = res.fetchone()
         return user_fetch is not None and user_fetch[0] == player.password
 
+
+class ConnNPC(NPC):
+    def __init__(self, conn):
+        self.conn = conn
+        self.ready = False
+        super().__init__(self)
+
+
+def print_count(text, textargs, nreverselines):
+    if nreverselines == -1:
+        sys.stdout.write(text.format(*textargs))
+        sys.stdout.write("\n")
+    else:
+        sys.stdout.write("\033[{n}A".format(n=nreverselines+1))
+        sys.stdout.write(text.format(*textargs))
+        sys.stdout.write("\033[{n}B".format(n=nreverselines+1))
+        sys.stdout.write("\033[0G")
+    sys.stdout.flush()
+
 PRINT_USERS_JOIN = "Usuarios unidos: {0}/{1}"
 PRINT_USERS_READY = "Usuarios listos: {0}/{1}"
 
+
 def handle_player_join(conn, addr, server, players):
-    player = ConnPlayer(conn, *server.recv_obj())
+    if server.recv_msg() == "Player":
+        player = ConnHumanPlayer(conn, *server.recv_obj())
 
-    if not ConnPlayer.is_user_correct_login_db(player):
-        server.send_msg(MSGERRJOIN_NOT_EXISTS)
-        conn.close()
-        return
+        if not ConnPlayer.is_user_correct_login_db(player):
+            server.send_msg(MSGERRJOIN_NOT_EXISTS)
+            conn.close()
+            return
 
-    if any(map(lambda p: p.alias == player.alias, players)):
-        server.send_msg(MSGERRJOIN_ALREADY_JOINED)
-        conn.close()
-        return
+        if any(map(lambda p: p.alias == player.alias, players)):
+            server.send_msg(MSGERRJOIN_ALREADY_JOINED)
+            conn.close()
+            return
+    else:
+        player = ConnNPC(conn)
 
     """
     Two players can join at the same time,
     and the first reaches the MAX_PLAYERS
     with an exception in the second.
+
     Is discarded by almost null probability
     and does not affect the system
     (can be controlled in the user)
@@ -358,25 +400,29 @@ def start_game(players):
     )
 
     consumer = KafkaConsumer(
-     "mapa",
-     bootstrap_servers=['localhost:29092'],
-     auto_offset_reset='earliest',
-     enable_auto_commit=True,
-     group_id="0",
-     value_deserializer = lambda v: pickle.loads(v)
+        "movement",
+        group_id = "engine",
+        bootstrap_servers = ["localhost:29092"],
+        auto_offset_reset = "earliest",
+        enable_auto_commit = True,
+        value_deserializer = lambda v: pickle.loads(v)
     )
 
     producer.send("map", value={"None":game.getMap()})
 
     for msg in consumer:
-        playeralias, direc = list(msg.value.items())[0]
+        playeralias, direc = msg.value.items().popitem()
         print(playeralias, "se mueve en la direcion", direc)
-        game.move(playeralias, direc)
+        game.move(playeralias, Direction.fromStr(direc))
         producer.send("map", value={playeralias:game.getMap()})
 
         if game.isended():
             print("La partida ha terminado")
-            print("Ha ganado el jugador", list(game.getPlayers())[0])
+            winplayer = list(game.getPlayers())[0]
+            if isinstance(winplayer, Player):
+                print("Ha ganado el jugador", winplayer)
+            else:
+                print("No ha ganado ningun jugador")
             break
 
 #==================================================
