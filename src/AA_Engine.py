@@ -318,7 +318,6 @@ def handle_player_join(conn, addr, server, players):
     Two players can join at the same time,
     and the first reaches the MAX_PLAYERS
     with an exception in the second.
-
     Is discarded by almost null probability
     and does not affect the system
     (can be controlled in the user)
@@ -359,12 +358,12 @@ def start_game(players):
     )
 
     consumer = KafkaConsumer(
-        "movement",
-        group_id = "engine",
-        bootstrap_servers = ["localhost:29092"],
-        auto_offset_reset = "earliest",
-        enable_auto_commit = True,
-        value_deserializer = lambda v: pickle.loads(v)
+     "mapa",
+     bootstrap_servers=['localhost:29092'],
+     auto_offset_reset='earliest',
+     enable_auto_commit=True,
+     group_id="0",
+     value_deserializer = lambda v: pickle.loads(v)
     )
 
     producer.send("map", value={"None":game.getMap()})
@@ -372,7 +371,7 @@ def start_game(players):
     for msg in consumer:
         playeralias, direc = list(msg.value.items())[0]
         print(playeralias, "se mueve en la direcion", direc)
-        game.move(playeralias, Direction.fromStr(direc))
+        game.move(playeralias, direc)
         producer.send("map", value={playeralias:game.getMap()})
 
         if game.isended():
