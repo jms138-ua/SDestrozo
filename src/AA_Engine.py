@@ -1,5 +1,5 @@
 """
-args: <port> <maxplayers> <AA_Weather-ip>:<AA_Weather-port>
+args: <port> <maxplayers> <AA_Weather-ip>:<AA_Weather-port> <kafka-ip>
 
 client.send_msg("Player"|"NPC")
 if Player:
@@ -22,9 +22,10 @@ import sys, threading, pickle, random
 
 
 ADDR = ("", int(sys.argv[1]))
-ADDR__AA_WEATHER = ("localhost", int(sys.argv[3]))
 
 ADDR__AA_WEATHER = (sys.argv[3].split(":")[0], int(sys.argv[3].split(":")[1]))
+
+ADDR__KAFKA = [sys.argv[4]+":29092"]
 
 FDATA_DB = "../data/db.db"
 
@@ -71,7 +72,7 @@ class HumanPlayer(Player):
     def __init__(self, alias, password):
         self.alias = alias
         self.password = password
-        super().__init__(self, level=1)
+        super().__init__(level=1)
         self.ef = random.randint(-10,10)
         self.ec = random.randint(-10,10)
         self.temperature = None
@@ -302,7 +303,7 @@ class ConnHumanPlayer(HumanPlayer):
     def __init__(self, conn, alias, password):
         self.conn = conn
         self.ready = False
-        super().__init__(self, alias, password)
+        super().__init__(alias, password)
 
     def is_user_correct_login_db(player):
         res = rundb(FDATA_DB,
@@ -321,7 +322,7 @@ class ConnNPC(NPC):
     def __init__(self, conn):
         self.conn = conn
         self.ready = False
-        super().__init__(self)
+        super().__init__()
 
 
 def print_count(text, textargs, nreverselines):
@@ -395,14 +396,14 @@ def start_game(players):
     print(game)
 
     producer = KafkaProducer(
-        bootstrap_servers=["localhost:29092"],
-        value_serializer=lambda v: pickle.dumps(v)
+        bootstrap_servers = ADDR__KAFKA,
+        value_serializer = lambda v: pickle.dumps(v)
     )
 
     consumer = KafkaConsumer(
         "movement",
         group_id = "engine",
-        bootstrap_servers = ["localhost:29092"],
+        bootstrap_servers = ADDR__KAFKA,
         auto_offset_reset = "earliest",
         enable_auto_commit = True,
         value_deserializer = lambda v: pickle.loads(v)
