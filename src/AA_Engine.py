@@ -30,6 +30,7 @@ ADDR__KAFKA = [sys.argv[4]+":29092"]
 FDATA_DB = "../data/db.db"
 
 MAX_PLAYERS = int(sys.argv[2])
+GAME_TIMEOUT = 60*30
 
 MSGREJOIN = "Usuario unido a la partida"
 MSGERRJOIN_NOT_EXISTS = "Error. La cuenta no coincide con ninguna registrada"
@@ -404,6 +405,7 @@ def start_game(players):
     consumer = KafkaConsumer(
         "movement",
         group_id = "engine",
+        consumer_timeout_ms = GAME_TIMEOUT*1000,
         bootstrap_servers = ADDR__KAFKA,
         auto_offset_reset = "earliest",
         enable_auto_commit = True,
@@ -419,13 +421,14 @@ def start_game(players):
         producer.send("map", value={playeralias:game.getMap()})
 
         if game.isended():
-            print("La partida ha terminado")
-            winplayer = list(game.getPlayers())[0]
-            if isinstance(winplayer, Player):
-                print("Ha ganado el jugador", winplayer)
-            else:
-                print("No ha ganado ningun jugador")
             break
+
+    print("La partida ha terminado")
+    winplayer = max(game.getPlayers(), key=lambda player: player.getTotalLevel())
+    if isinstance(winplayer, Player):
+        print("Ha ganado el jugador", winplayer)
+    else:
+        print("No ha ganado ningun jugador")
 
 #==================================================
 
