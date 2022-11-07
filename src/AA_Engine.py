@@ -158,6 +158,7 @@ class Map():
 
     def __init__(self):
         self.map = Map.newRandMap()
+        self.cities = list(Requests.get_cities(4))
 
     def __str__(self):
         strmap = ""
@@ -200,27 +201,27 @@ class Map():
             map.append(row)
         return map
 
-    def getCity(cities, cell):
+    def getTemperature(self, cell):
         '''
         |0|1|
         |2|3|
         '''
         if cell.getColumn() < Map.SIZE_CITY:
             if cell.getRow() < Map.SIZE_CITY:
-                return cities[0]
+                sector = 0
             else:
-                return cities[1]
+                sector = 1
         else:
             if cell.getRow() < Map.SIZE_CITY:
-                return cities[2]
+                sector = 2
             else:
-                return cities[3]
+                sector = 3
+        return self.cities[sector]["temperature"]
 
 
 class Game():
     def __init__(self):
         self.map = Map()
-        self.cities = list(Requests.get_cities(4))
         self.players = dict()
 
     def __str__(self):
@@ -250,7 +251,7 @@ class Game():
 
     def updatePlayer(self, player, pos):
         player.pos = pos
-        player.temperature = Map.getCity(self.cities, pos)["temperature"]
+        player.temperature = self.map.getTemperature(pos)
 
     def newRandPlayer(self, player):
         while True:
