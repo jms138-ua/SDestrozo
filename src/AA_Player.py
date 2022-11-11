@@ -1,250 +1,111 @@
-import sys, threading, pickle
-import pygame
+import sys, pickle, os
 import random
-from pygame.locals import *
-import time
+import time, platform
 from threading import Thread
 from random import randrange
 from common_utils import MySocket
 from kafka import KafkaConsumer, KafkaProducer
 
-SIZE_MAP = 20
-SIZE_CITY = SIZE_MAP / 2
+ADDR_R = ("localhost", int(sys.argv[1]))
+ADDR_E = ("localhost", int(sys.argv[2]))
 
-MARGEN = 5
-MARGEN_SUPERIOR = 60
-MARGEN_INFERIOR = 60
-TAM = 30
+class bcolors:
+    BLACK = "\033[0;30m"
+    RED = "\033[0;31m"
+    GREEN = "\033[0;32m"
+    BLUE = "\033[0;34m"
+    PURPLE = "\033[0;35m"
+    CYAN = "\033[0;36m"
+    GRAY = "\033[0;37m"
+    BROWN = "\033[0;33m"
+    LIGHT_GREEN = "\033[1;32m"
+    YELLOW = "\033[1;33m"
+    LIGHT_BLUE = "\033[1;34m"
+    BOLD = "\033[1m"
+    ITALIC = "\033[3m"
+    BLINK = "\033[5m"
+    WHITE = "\033[0;37m"
+    END = "\033[0m"
 
-BLACK=(0,0,0)
-WHITE=(255, 255,255)
-GREEN=(0, 255,0)
-RED=(255, 0, 0)
-BLUE=(0, 0, 255)
-YELLOW=(255, 255, 0)
-CITY1=(179,230,181)
-CITY2=(173,216,230)
-CITY3=(255,255,224)
-CITY4=(235,236,240)
-
-ADDR = ("localhost", int(sys.argv[1])) # de registry
-ADDR_E = ("localhost", int(sys.argv[2])) # de engine
-
-# puerto engine: 1236
-# weather 1234
-# registry: 1235
-
-# python3 AA_Weather.py 1234
-# python3 AA_Registry.py 1235
-# python3 AA_Engine.py 1236 9 1234
-# python3 AA_Player.py 1235 1236
-
-pygame.init()
-COLOR_INACTIVE = pygame.Color('white')
-COLOR_ACTIVE = pygame.Color('yellow')
-FONT = pygame.font.Font(None, 32)
-
-class InputBox:
-
-    def __init__(self, x, y, w, h, text):
-        self.rect = pygame.Rect(x, y, w, h)
-        self.color = COLOR_INACTIVE
-        self.text = text
-        self.txt_surface = FONT.render(text, True, self.color)
-        self.active = False
-        self.done = False
-        self.textcopy = ''
-
-    def handle_event(self, event):
-        if event.type == pygame.MOUSEBUTTONDOWN:
-            if self.rect.collidepoint(event.pos):
-                self.active = not self.active
-            else:
-                self.active = False
-            self.color = COLOR_ACTIVE if self.active else COLOR_INACTIVE
-            self.txt_surface = FONT.render(self.text, True, self.color)
-        if event.type == pygame.KEYDOWN:
-            if self.active:
-                if event.key == pygame.K_BACKSPACE:
-                    self.text = self.text[:-1]
-                else:
-                    self.text += event.unicode
-                # Re-render the text.
-                self.txt_surface = FONT.render(self.text, True, self.color)
-
-    def update(self):
-        # Resize the box if the text is too long.
-        width = max(200, self.txt_surface.get_width()+10)
-        self.rect.w = width
-
-    def draw(self, screen, login):
-        if self.done == True and login == True:
-            self.txt_surface = FONT.render('', True, 'black')
-            screen.blit(self.txt_surface, (self.rect.x+5, self.rect.y+5))
-            pygame.draw.rect(screen, 'black', self.rect, 2)
-        else:
-            # Blit the text.
-            screen.blit(self.txt_surface, (self.rect.x+5, self.rect.y+5))
-            # Blit the rect.
-            pygame.draw.rect(screen, self.color, self.rect, 2)
-
-def checkField(player, cell):
-    if game.checkPosition(cell) == AA_Engine.Cell.MINE:
-        screen.fill(RED)
-        screen.blit(game_over, (200,330))
-
-        pygame.display.update()
-        time.sleep(2)
-        pygame.quit()
-        sys.exit()
-
-    elif game.checkPosition(cell) == AA_Engine.Cell.FOOD:
-        player.setLevel(player.getLevel() + 1)
-        print(player)
-
-    elif game.checkPosition(cell) == AA_Engine.Cell.EMPTY:
-        pass
-
+def clear_console():
+    if platform.system() == "Windows":
+        os.system('cls')
     else:
-        # value = game.fight(player, npc)
-        value = 0
+        os.system('clear')
 
-        if value > 0:
-            print("has ganado")
+# printleaderboard -> coges el símbolo raro, pillas su nivel y ordenas, muestras nombres ARRIBA del mapa
+def printLeaderBoard(mapa):
+    print("***********************************")
+    print("*       TABLA DE CAMPEONES        *")
+    print("***********************************")
 
-        elif value < 0:
-            screen.fill(RED)
-            screen.blit(game_over, (200,330))
+    players = []
+    i = 0
+    champion = ""
+    color = bcolors.WHITE
 
-            pygame.display.update()
-            time.sleep(2)
-            pygame.quit()
-            sys.exit()
-
-    '''
-    if game.checkPosition(cell) == AA_Engine.Cell.FOOD:
-        screen.fill(GREEN)
-        screen.blit(you_win, (230,330))
-        pygame.display.update()
-        time.sleep(2)
-        pygame.quit()
-        sys.exit()
-    '''
-
-def landingPage():
-
-    running = True
-    option = 0
-    screen.fill(BLACK)
-
-    # width x height = 705 x 765
-    # bg = pygame.image.load("descargar.jpg")
-    # screen.blit(bg, (0, 0))
-
-    # x, y, w, h
-    rect1 = pygame.Rect(280, 100, 170, 32)
-    txt_surface = FONT.render(' Crear usuario', True, 'white')
-    screen.blit(txt_surface, (280+5, 100+5))
-    pygame.draw.rect(screen, 'yellow', rect1, 2)
-
-    rect2 = pygame.Rect(280, 250, 170, 32)
-    txt_surface = FONT.render('   Editar perfil', True, 'white')
-    screen.blit(txt_surface, (280+5, 250+5))
-    pygame.draw.rect(screen, 'yellow', rect2, 2)
-
-    rect3 = pygame.Rect(280, 400, 170, 32)
-    txt_surface = FONT.render('  Borrar perfil', True, 'white')
-    screen.blit(txt_surface, (280+5, 400+5))
-    pygame.draw.rect(screen, 'yellow', rect3, 2)
-
-    rect4 = pygame.Rect(280, 550, 170, 32)
-    txt_surface = FONT.render(' Iniciar sesión', True, 'white')
-    screen.blit(txt_surface, (280+5, 550+5))
-    pygame.draw.rect(screen, 'yellow', rect4, 2)
-
-    pygame.display.flip()
-
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
-        elif event.type == pygame.MOUSEBUTTONDOWN:
-            if rect1.collidepoint(event.pos):
-                option = 1
-            elif rect2.collidepoint(event.pos):
-                option = 2
-            elif rect3.collidepoint(event.pos):
-                option = 3
-            elif rect4.collidepoint(event.pos):
-                option = 4
-
-    pygame.display.flip()
-
-    # login, crear usuario, editar perfil (actualizar y borrar)
-
-    # para hoy: pantalla registro y conexión
-    # mañana: conexión registro
-    # miércoles: conexión engine (login), interfaz ya bien, conexión engine con mapa
-
-    return running, option
-
-def printMap(map):
-    screen.fill(BLACK)
     for fil in range(20):
         for col in range(20):
-            if map[fil][col] == "M":
-                pygame.draw.rect(screen, RED, [(TAM+MARGEN)*col+MARGEN, (TAM+MARGEN)*fil+MARGEN, TAM, TAM], 0)
-            elif map[fil][col] == " ":
-                if fil < 10 and col < 10:
-                    pygame.draw.rect(screen, CITY1, [(TAM+MARGEN)*col+MARGEN, (TAM+MARGEN)*fil+MARGEN, TAM, TAM], 0)
-                elif fil < 10 and col >= 10:
-                    pygame.draw.rect(screen, CITY2, [(TAM+MARGEN)*col+MARGEN, (TAM+MARGEN)*fil+MARGEN, TAM, TAM], 0)
-                elif fil >= 10 and col < 10:
-                    pygame.draw.rect(screen, CITY3, [(TAM+MARGEN)*col+MARGEN, (TAM+MARGEN)*fil+MARGEN, TAM, TAM], 0)
-                else:
-                    pygame.draw.rect(screen, CITY4, [(TAM+MARGEN)*col+MARGEN, (TAM+MARGEN)*fil+MARGEN, TAM, TAM], 0)
-            elif map[fil][col] == "A":
-                pygame.draw.rect(screen, GREEN, [(TAM+MARGEN)*col+MARGEN, (TAM+MARGEN)*fil+MARGEN, TAM, TAM], 0)
-            else:
-                pygame.draw.rect(screen, BLUE, [(TAM+MARGEN)*col+MARGEN, (TAM+MARGEN)*fil+MARGEN, TAM, TAM], 0)
-    pygame.display.update()
+            if mapa[fil][col] != "M" and mapa[fil][col] != " " and mapa[fil][col] != "A":
+                othersym = mapa[fil][col][0]
+                alias = othersym[0]
+                if len(alias) >= 18:
+                    alias = alias[0:18] + "..."
+                level = str(othersym[1])
 
-def printEmpty():
+                players.append((alias,level))
+
+    sorted_players = sorted(players, key=lambda tup: tup[1])
+    sorted_players = sorted(sorted_players, key=lambda tup: tup[0])
+    for (x,y) in sorted_players:
+        i+=1
+        if i == 1:
+            color = bcolors.YELLOW
+        else:
+            color = bcolors.WHITE
+        print(color + str(i) + " - " + x + ": nivel " + y + bcolors.END)
+
+    print("***********************************")
+
+    if len(sorted_players) == 1:
+        clear_console()
+        for (x,y) in sorted_players:
+            champion = x.upper()
+        print(bcolors.GREEN+champion+" ha ganado el derecho de presumir"+bcolors.END)
+        time.sleep(2)
+        clear_console()
+        exit()
+
+def printMap(mapa):
+    clear_console()
+    color = bcolors.BLACK
+
+    printLeaderBoard(mapa)
+
     for fil in range(20):
         for col in range(20):
             if fil < 10 and col < 10:
-                pygame.draw.rect(screen, CITY1, [(TAM+MARGEN)*col+MARGEN, (TAM+MARGEN)*fil+MARGEN, TAM, TAM], 0)
+                color = bcolors.LIGHT_GREEN
             elif fil < 10 and col >= 10:
-                pygame.draw.rect(screen, CITY2, [(TAM+MARGEN)*col+MARGEN, (TAM+MARGEN)*fil+MARGEN, TAM, TAM], 0)
+                color = bcolors.LIGHT_BLUE
             elif fil >= 10 and col < 10:
-                pygame.draw.rect(screen, CITY3, [(TAM+MARGEN)*col+MARGEN, (TAM+MARGEN)*fil+MARGEN, TAM, TAM], 0)
+                color = bcolors.RED
             else:
-                pygame.draw.rect(screen, CITY4, [(TAM+MARGEN)*col+MARGEN, (TAM+MARGEN)*fil+MARGEN, TAM, TAM], 0)
-
-def getReady(client, ready, ready_times, running):
-    btn_ready = pygame.Rect(300, 730, 170, 32)
-    screen.fill(BLACK)
-    printEmpty()
-
-    if ready == False:
-        txt_surface = FONT.render('Todo listo', True, 'blue')
-        screen.blit(txt_surface, (300, 730))
-        pygame.draw.rect(screen, 'black', btn_ready, 2)
-
-    if ready == True and ready_times < 2:
-        ready_times = ready_times + 1
-        client.send_msg("Ready")
-
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
-        elif event.type == pygame.MOUSEBUTTONDOWN:
-            if btn_ready.collidepoint(event.pos) and ready == False:
-                ready = True
-                ready_times = ready_times + 1
-
-    pygame.display.update()
-
-    return ready, client, running, ready_times
+                color = bcolors.GRAY
+            if mapa[fil][col] == "M":
+                symbol = "#"
+            elif mapa[fil][col] == " ":
+                symbol = "·"
+            elif mapa[fil][col] == "A":
+                symbol = "+"
+            else:
+                othersym = mapa[fil][col][0]
+                symbol = othersym[0:1]
+                othersym = symbol[0]
+                symbol = othersym[0:1].upper()
+                color = bcolors.YELLOW
+            print(color+"%%-%ds" % 2 % symbol+bcolors.END, end="")
+        print()
 
 def getDirec(cardinal):
     tuplita = (0,0)
@@ -270,396 +131,242 @@ def getDirec(cardinal):
 
     return tuplita
 
-def funcrecv(alias):
+def funcsend(alias):
+    producer = KafkaProducer(
+        bootstrap_servers = ["localhost:29092"],
+        value_serializer = lambda v: pickle.dumps(v)
+    )
+    i = (0,0)
+    direc = ""
+    cardinal = ""
+    alive = True
+    while alive:
+        direc = input()
+        if direc.upper() == "W":
+            cardinal = "N"
+        elif direc.upper() == "A":
+            cardinal = "W"
+        elif direc.upper() == "S":
+            cardinal = "S"
+        elif direc.upper() == "D":
+            cardinal = "E"
+        i = getDirec(cardinal)
+        data = {alias:i}
+        if i != (0,0):
+            producer.send('mapa', value=data)
+        i = (0,0)
+        direc = ""
+        cardinal = ""
+
+def funcrecv(ini_map):
     consumer = KafkaConsumer(
      "map",
      bootstrap_servers=['localhost:29092'],
      auto_offset_reset='earliest',
      enable_auto_commit=True,
-     group_id="aa",
+     group_id="ax",
      value_deserializer = lambda v: pickle.loads(v)
     )
 
-    producer = KafkaProducer(
-        bootstrap_servers = ["localhost:29092"],
-        value_serializer = lambda v: pickle.dumps(v)
-    )
-
-    #direc=["N","S","W","E","NE","SW","NW","SE"]
-    clock = pygame.time.Clock()
-    i = (0,0)
-    direc = ""
-
+    printMap(ini_map)
     for msg in consumer:
         mapa = list(msg.value.values())[0]
         printMap(mapa)
-        pygame.display.flip()
-        clock.tick(20)
-        event = pygame.event.wait()
-        if event.type == pygame.QUIT:
-            pygame.quit()
-            sys.exit()
-        elif event.type == pygame.KEYDOWN:
-            if direc == "":
-                if event.key == pygame.K_LEFT:
-                    direc = "N"
-                elif event.key == pygame.K_RIGHT:
-                    direc = "S"
-                elif event.key == pygame.K_UP:
-                    direc = "W"
-                elif event.key == pygame.K_DOWN:
-                    direc = "E"
-                else:
-                    direc = "X"
-            #random_idx = random.randint(0,7)
-            i = getDirec(direc)
-        if i != (0,0):
-            data = {alias:i}
-            producer.send('mapa', value=data)
-            print("he enviado un: " + direc)
-        i = (0,0)
-        direc = ""
 
-def startMatch(alias):
-    screen.fill(BLACK)
-    printEmpty()
-    pygame.display.update()
-
-    funcrecv(alias)
+def startMatch(alias, mapa):
+    Thread(target=funcrecv, args=(mapa,), daemon=True).start()
+    t2 = Thread(target=funcsend, args=(alias,), daemon=True)
+    t2.start()
+    t2.join()
+    print("he salido de la pista")
     time.sleep(10000)
 
-if __name__=="__main__":
+def getReady():
+    mapa = None
 
-    x = random.randint(0, 19)
-    y = random.randint(0, 19)
+    clear_console()
+    print(bcolors.RED+"Esperando a jugadores, no salgas de la partida"+bcolors.END)
 
-    # game = AA_Engine.Game()
-    player = None
-    # fromcell = AA_Engine.Cell(x,y)
+    consumer = KafkaConsumer(
+     "map",
+     bootstrap_servers=['localhost:29092'],
+     auto_offset_reset='earliest',
+     enable_auto_commit=True,
+     group_id="al",
+     consumer_timeout_ms= 60 * 30 * 1000,
+     value_deserializer = lambda v: pickle.loads(v)
+    )
 
-    # npc de prueba para testear el fight, falta una interacción
-    # npc = game.newPlayer("NPC", AA_Engine.Cell(4, 4))
-    # npc.setLevel(10)
+    mustend = time.time() + 60 * 30
+    if time.time() < mustend:
+        msg = next(consumer)
+        mapa = list(msg.value.values())[0]
 
-    pygame.init()
+    return mapa
 
-    font = pygame.font.SysFont("Verdana", 60)
-    game_over = font.render("Game Over", True, BLACK)
-    you_win = font.render("You Win", True, BLACK)
+def printMsg(msg):
+    if msg[0:5] == "Error":
+        print(bcolors.YELLOW+msg+bcolors.END)
+    else:
+        print(bcolors.GREEN+msg+bcolors.END)
 
-    clock = pygame.time.Clock()
+def checkUserData(username, password):
+    alias = passwd = name = ""
+    chars = False
 
-    width = 705
-    height = 765
-    # width = game.map.SIZE*(TAM+MARGEN) + MARGEN
-    # height = MARGEN_INFERIOR + game.map.SIZE*(TAM+MARGEN) + MARGEN
-    dimension = [width, height]
-    screen=pygame.display.set_mode(dimension)
-    pygame.display.set_caption("SDestrozo")
+    alias = ''.join(e for e in username if e.isalnum())
+    passwd = ''.join(e for e in password if e.isalnum())
 
-    text_input_boxa1 = InputBox(250, 150, width/2 - 100, 32, "")
-    text_input_boxa2 = InputBox(250, 350, width/2 - 100, 32, "")
-    input_boxes_a = [text_input_boxa1, text_input_boxa2]
-
-    text_input_boxb1 = InputBox(250, 100, width/2 - 100, 32, "")
-    text_input_boxb2 = InputBox(250, 200, width/2 - 100, 32, "")
-    text_input_boxb3 = InputBox(250, 300, width/2 - 100, 32, "")
-    text_input_boxb4 = InputBox(250, 400, width/2 - 100, 32, "")
-    input_boxes_b = [text_input_boxb1, text_input_boxb2, text_input_boxb3, text_input_boxb4]
-
-    text_input_boxc1 = InputBox(0, 700, width/2 - 100, 32, "U")
-    text_input_boxc2 = InputBox(0, 733, width/2 - 100, 32, "C")
-    input_boxes_c = [text_input_boxc1, text_input_boxc2]
-
-    text = ''
-    font2 = pygame.font.Font(None, 32)
-    user = passwd = newuser = newpasswd = ''
-
-    running=True
-    start = False
-    login = False
-    created = False
-    option = 0
-    usr_login = ""
-    passwd_login = ""
-    already_here = False
-    msg = ''
-    thread = 0
-    ready = False
-    ready_times = 0
-
-    while running:
-        if option  == 0:
-            running, option = landingPage()
-        elif option == 1 or option == 3 or option == 4:
-            login = False
-            already_here = False
-            input_boxes_a[0].done = False
-            input_boxes_a[1].done = False
-
-            if login == False:
-                screen.fill(BLACK)
-
-                rect1 = pygame.Rect(300, 100, 170, 28)
-                txt_surface = FONT.render('Usuario', True, 'white')
-                screen.blit(txt_surface, (300, 100))
-                pygame.draw.rect(screen, 'black', rect1, 2)
-
-                rect2 = pygame.Rect(280, 300, 170, 28)
-                txt_surface = FONT.render('Contraseña', True, 'white')
-                screen.blit(txt_surface, (285, 300))
-                pygame.draw.rect(screen, 'black', rect2, 2)
-
-                create = pygame.Rect(310, 500, 170, 32)
-
-                if option == 1:
-                    txt_surface = FONT.render('Crear', True, 'orange')
-                elif option == 3:
-                   txt_surface = FONT.render('Borrar', True, 'red')
-                elif option == 4:
-                   txt_surface = FONT.render('Jugar', True, 'yellow')
-
-                screen.blit(txt_surface, (310+5, 500+5))
-                pygame.draw.rect(screen, 'black', create, 2)
-
-                txt_msg = FONT.render('', True, 'yellow')
-                screen.blit(txt_msg, (280+5, 600+5))
-
-                pygame.display.update()
-
-                for event in pygame.event.get():
-                    if event.type == pygame.QUIT:
-                        running = False
-                    elif event.type == pygame.MOUSEBUTTONDOWN:
-                        if create.collidepoint(event.pos):
-                            for box in input_boxes_a:
-                                print(box.text)
-                                box.done = True
-                                box.textcopy = box.text
-                                box.text = ''
-                    for box in input_boxes_a:
-                        box.handle_event(event)
-
-                if input_boxes_a[0].done == True:
-                    user = input_boxes_a[0].textcopy
-                if input_boxes_a[1].done == True:
-                    passwd = input_boxes_a[1].textcopy
-
-                if user != '' and passwd != '':
-                    if option == 4:
-                        client1 = MySocket("TCP", ADDR_E)
-                        client1.send_obj((user,passwd))
-                        msg = client1.recv_msg()
-                        print(msg)
-                        first_chars = msg[0:5]
-                        if first_chars != "Error":
-                            login = True
-                            while login == True and running == True and ready_times < 2:
-                                ready, client1, running, ready_times = getReady(client1, ready, ready_times, running)
-                            while ready == True and running == True and thread == 0:
-                                startMatch(user)
-                                thread = thread + 1
-                            if running == False:
-                                client1.close()
-                                pygame.quit()
-                                sys.exit()
-                            usr_login = user
-                            passwd_login = passwd
-                        else:
-                            option = 0
-                        already_here = True
-                        txt_msg = FONT.render(msg, True, 'yellow')
-                        screen.blit(txt_msg, (20, 600))
-                        pygame.display.update()
-                        time.sleep(2)
-                    if already_here == False:
-                        client2 = MySocket("TCP", ADDR)
-                        if option == 1:
-                            client2.send_msg("Create")
-                            client2.send_obj((user,passwd))
-                            msg = client2.recv_msg()
-                            already_here = True
-                            login = True
-                            option = 0
-                            txt_msg = FONT.render(msg, True, 'yellow')
-                            screen.blit(txt_msg, (20, 600))
-                            pygame.display.update()
-                            time.sleep(2)
-                        elif option == 3:
-                            client2.send_msg("Delete")
-                            client2.send_obj((user,passwd))
-                            msg = client2.recv_msg()
-                            already_here = True
-                            login = False
-                            option = 0
-                            txt_msg = FONT.render(msg, True, 'yellow')
-                            screen.blit(txt_msg, (20, 600))
-                            pygame.display.update()
-                            time.sleep(2)
-                        client2.close()
-
-                    user = ''
-                    passwd = ''
-
-                for box in input_boxes_a:
-                    box.update()
-                    box.draw(screen, login)
-
-            pygame.display.flip()
-            clock.tick(20)
-
-        elif option == 2:
-            login = False
-            already_here = False
-            input_boxes_b[0].done = False
-            input_boxes_b[1].done = False
-            input_boxes_b[2].done = False
-            input_boxes_b[3].done = False
-
-            if login == False:
-                screen.fill(BLACK)
-
-                rect1 = pygame.Rect(300, 60, 170, 28)
-                txt_surface = FONT.render('Nombre', True, 'white')
-                screen.blit(txt_surface, (300, 65))
-                pygame.draw.rect(screen, 'black', rect1, 2)
-
-                rect2 = pygame.Rect(280, 160, 170, 28)
-                txt_surface = FONT.render('Contraseña', True, 'white')
-                screen.blit(txt_surface, (285, 165))
-                pygame.draw.rect(screen, 'black', rect2, 2)
-
-                rect3 = pygame.Rect(270, 270, 170, 20)
-                txt_surface = FONT.render('Nuevo nombre', True, 'white')
-                screen.blit(txt_surface, (270, 270))
-                pygame.draw.rect(screen, 'black', rect3, 2)
-
-                rect4 = pygame.Rect(250, 370, 170, 20)
-                txt_surface = FONT.render('Nueva contraseña', True, 'white')
-                screen.blit(txt_surface, (255, 370))
-                pygame.draw.rect(screen, 'black', rect4, 2)
-
-                edit = pygame.Rect(310, 500, 170, 32)
-                txt_surface = FONT.render('Editar', True, 'green')
-                screen.blit(txt_surface, (310+5, 500+5))
-                pygame.draw.rect(screen, 'black', edit, 2)
-
-                pygame.display.update()
-
-                for event in pygame.event.get():
-                    if event.type == pygame.QUIT:
-                        running = False
-                    elif event.type == pygame.MOUSEBUTTONDOWN:
-                        if edit.collidepoint(event.pos):
-                            for box in input_boxes_b:
-                                print(box.text)
-                                box.done = True
-                                box.textcopy = box.text
-                                box.text = ''
-                    for box in input_boxes_b:
-                        box.handle_event(event)
-
-                if input_boxes_b[0].done == True:
-                    user = input_boxes_b[0].textcopy
-                if input_boxes_b[1].done == True:
-                    passwd = input_boxes_b[1].textcopy
-                if input_boxes_b[2].done == True:
-                    newuser = input_boxes_b[2].textcopy
-                if input_boxes_b[3].done == True:
-                    newpasswd = input_boxes_b[3].textcopy
-
-                if user != '' and passwd != '' and newuser != '' and newpasswd != '':
-                    if already_here == False:
-                        with MySocket("TCP", ADDR) as client3:
-                            client3.send_msg("Update")
-                            client3.send_obj((user,passwd))
-                            client3.send_obj((newuser,newpasswd))
-                            msg = client3.recv_msg()
-                            already_here = True
-                            login = True
-                            option = 0
-                            txt_msg = FONT.render(msg, True, 'yellow')
-                            screen.blit(txt_msg, (20, 600))
-                            pygame.display.update()
-                            time.sleep(2)
-                    user = passwd = newuser = newpasswd = ''
-
-                for box in input_boxes_b:
-                    box.update()
-                    box.draw(screen, login)
-
-            pygame.display.flip()
-            clock.tick(20)
-
-        elif option == 5:
+    for e in alias:
+        if e.isnumeric() and chars == False:
             pass
+        else:
+            chars = True
+            name = name + e
+        chars = False
 
-        '''
-        login = False
-            already_here = False
-            input_boxes_c[0].done = False
-            input_boxes_c[1].done = False
-            # client.send_obj(us,con)
-            # client.recv_msg
-            # client.send_msg("ready")
-            # nueva pestaña: iniciar sesión -> si ready vas al mapa. nada de no ready
-            if login == False:
-                fuente= pygame.font.Font(None, 30)
-                texto= fuente.render("", True, BLACK)
-                screen.blit(texto, [width-120, AA_Engine.Map.SIZE*(TAM+MARGEN)+MARGEN+15])
-                pygame.display.update()
-                for event in pygame.event.get():
-                    if event.type == pygame.QUIT:
-                        running = False
-                    for box in input_boxes_c:
-                        box.handle_event(event)
-                if input_boxes_c[0].done == True:
-                    user = input_boxes_c[0].textcopy
-                if input_boxes_c[1].done == True:
-                    passwd = input_boxes_c[1].textcopy
-                if user != '' and passwd != '':
-                    if already_here == False:
-                        with MySocket("TCP", ADDR) as client:
-                            client.send_msg("Create")
-                            client.send_obj((user,passwd))
-                            print(client.recv_msg())
-                            already_here = True
-                            login = True
-                for box in input_boxes_c:
-                    box.update()
-                    box.draw(screen, login)
-            if login == True:
-                if created == False:
-                    player = game.newPlayer(input_boxes_c[0].textcopy, AA_Engine.Cell(x, y))
-                    created = True
-                fuente= pygame.font.Font(None, 30)
-                texto= fuente.render("Nivel: "+str(player.getLevel()), True, YELLOW)
-                screen.blit(texto, [width-120, AA_Engine.Map.SIZE*(TAM+MARGEN)+MARGEN+15])
-                for event in pygame.event.get():
-                    if event.type == pygame.QUIT:
-                        running = False
-                    elif event.type == pygame.KEYDOWN:
-                        if event.key == pygame.K_LEFT:
-                            checkField(player, fromcell + AA_Engine.Direction.N)
-                            game.move(player.getAlias(), fromcell, AA_Engine.Direction.N)
-                            fromcell = fromcell + AA_Engine.Direction.N
-                        elif event.key == pygame.K_RIGHT:
-                            checkField(player, fromcell + AA_Engine.Direction.S)
-                            game.move(player.getAlias(), fromcell, AA_Engine.Direction.S)
-                            fromcell = fromcell + AA_Engine.Direction.S
-                        elif event.key == pygame.K_UP:
-                            checkField(player, fromcell + AA_Engine.Direction.W)
-                            game.move(player.getAlias(), fromcell, AA_Engine.Direction.W)
-                            fromcell = fromcell + AA_Engine.Direction.W
-                        elif event.key == pygame.K_DOWN:
-                            checkField(player, fromcell + AA_Engine.Direction.E)
-                            game.move(player.getAlias(), fromcell, AA_Engine.Direction.E)
-                            fromcell = fromcell + AA_Engine.Direction.E
-                        fromcell.normalize(game.map.SIZE, game.map.SIZE)
-            pygame.display.flip()
-            clock.tick(40)
-            printMap(game)
-        '''
+    if name != "" and passwd != "":
+        return name, passwd
+    else:
+        print(bcolors.YELLOW+"Error, campo vacío"+bcolors.END)
+        return "", ""
 
-    pygame.quit()
-    sys.exit()
+def createUser():
+    clear_console()
+    print('- Crear usuario -')
+    confirmation = username = password = usr = passwd = ""
+
+    while confirmation != "S" and confirmation != "s":
+        confirmation = ""
+        username = input("¿Cómo te llamamos?: ")
+        password = input("Escribe una contraseña: ")
+
+        usr, passwd = checkUserData(username, password)
+        if usr != "" and passwd != "":
+            while confirmation != "S" and confirmation != "s" and confirmation != "N" and confirmation != "n":
+                confirmation = input("¿Quieres registrarte con estos datos? ["+ usr +","+passwd+"] (s/n): ")
+
+            if confirmation == "S" or confirmation == "s":
+                client = MySocket("TCP", ADDR_R)
+                client.send_msg("Create")
+                client.send_obj((usr,passwd))
+                msg = client.recv_msg()
+                printMsg(msg)
+                client.close()
+
+        username = password = usr = passwd = ""
+
+def editUser():
+    clear_console()
+    print('- Editar perfil -')
+    username = password = newuser = newpasswd = usr = passwd = ""
+
+    username = input("Nombre de usuario: ")
+    password = input("Contraseña: ")
+    newuser = input("Nuevo nombre: ")
+    newpasswd = input("Nueva contraseña: ")
+
+    usr, passwd = checkUserData(newuser, newpasswd)
+
+    if username == usr and password == passwd:
+        print(bcolors.YELLOW+"No hay nada que cambiar"+bcolors.END)
+    else:
+        client = MySocket("TCP", ADDR_R)
+        client.send_msg("Update")
+        client.send_obj((username,password))
+        client.send_obj((usr,passwd))
+        msg = client.recv_msg()
+        printMsg(msg)
+        client.close()
+
+def deleteUser():
+    clear_console()
+    print('- Borrar usuario -')
+    username = password = usr = passwd = ""
+
+    username = input("Nombre de usuario: ")
+    password = input("Contraseña: ")
+
+    usr, passwd = checkUserData(username, password)
+    if usr != "" and passwd != "":
+        client = MySocket("TCP", ADDR_R)
+        client.send_msg("Delete")
+        client.send_obj((usr,passwd))
+        msg = client.recv_msg()
+        printMsg(msg)
+        client.close()
+
+def login():
+    clear_console()
+    print('- Iniciar sesión -')
+    username = password = usr = passwd = ""
+    login = False
+    ready = "A"
+    mapa = None
+
+    username = input("Nombre de usuario: ")
+    password = input("Contraseña: ")
+
+    usr, passwd = checkUserData(username, password)
+    if usr != "" and passwd != "":
+        client = MySocket("TCP", ADDR_E)
+        client.send_obj((usr,passwd))
+        msg = client.recv_msg()
+        printMsg(msg)
+        if msg[0:5] != "Error":
+            login = True
+            while ready != "":
+                ready = input("Presiona ENTER cuando esté todo listo: ")
+            client.send_msg("Ready")
+            mapa = getReady()
+            startMatch(usr, mapa)
+
+def optionError():
+    print(bcolors.YELLOW+'Operación incorrecta. Escribe un número entre 1 y 5.'+bcolors.END)
+
+menu_options = {
+    1: 'Crear usuario',
+    2: 'Editar perfil',
+    3: 'Borrar perfil',
+    4: 'Iniciar sesión',
+    5: 'Salir',
+}
+
+def print_menu():
+    for key in menu_options.keys():
+        print (key, '-', menu_options[key])
+
+def main():
+    option = 0
+    exc = False
+    while(True):
+        time.sleep(2)
+        clear_console()
+        print("- Menú de SDestrozo -")
+        print_menu()
+        try:
+            option = int(input('Escoge una operación: '))
+        except:
+            exc = True
+            optionError()
+        if option == 1:
+            createUser()
+        elif option == 2:
+            editUser()
+        elif option == 3:
+            deleteUser()
+        elif option == 4:
+            login()
+        elif option == 5:
+            print(bcolors.CYAN+'Vuelve pronto'+bcolors.END)
+            time.sleep(1)
+            clear_console()
+            exit()
+        else:
+            if exc == False:
+                optionError()
+        exc = False
+        option = 0
+
+if __name__ == '__main__':
+    main()
