@@ -6,8 +6,9 @@ from random import randrange
 from common_utils import MySocket
 from kafka import KafkaConsumer, KafkaProducer
 
-ADDR_R = ("localhost", int(sys.argv[1]))
-ADDR_E = ("localhost", int(sys.argv[2]))
+ADDR_R = (sys.argv[1].split(":")[0], int(sys.argv[1].split(":")[1]))
+ADDR_E = (sys.argv[2].split(":")[0], int(sys.argv[2].split(":")[1]))
+ADDR_K = [sys.argv[3]+":29092"]
 
 class bcolors:
     BLACK = "\033[0;30m"
@@ -33,30 +34,30 @@ def clear_console():
     else:
         os.system('clear')
 
-# printleaderboard -> coges el símbolo raro, pillas su nivel y ordenas, muestras nombres ARRIBA del mapa
 def printLeaderBoard(mapa):
     print("***********************************")
     print("*       TABLA DE CAMPEONES        *")
     print("***********************************")
 
-    players = []
+    players = sorted_players = []
+    SIZE = 20
     i = 0
     champion = ""
     color = bcolors.WHITE
 
-    for fil in range(20):
-        for col in range(20):
+    for fil in range(SIZE):
+        for col in range(SIZE):
             if mapa[fil][col] != "M" and mapa[fil][col] != " " and mapa[fil][col] != "A":
                 othersym = mapa[fil][col][0]
                 alias = othersym[0]
-                if len(alias) >= 18:
-                    alias = alias[0:18] + "..."
+                if len(alias) >= SIZE - 2:
+                    alias = alias[0:SIZE - 2] + "..."
                 level = str(othersym[1])
 
                 players.append((alias,level))
 
-    sorted_players = sorted(players, key=lambda tup: tup[1])
-    sorted_players = sorted(sorted_players, key=lambda tup: tup[0])
+    sorted_players = list(sorted(players, key=lambda x: x[1]))
+
     for (x,y) in sorted_players:
         i+=1
         if i == 1:
@@ -142,6 +143,7 @@ def funcsend(alias):
     alive = True
     while alive:
         direc = input()
+        clear_console()
         if direc.upper() == "W":
             cardinal = "N"
         elif direc.upper() == "A":
@@ -153,7 +155,7 @@ def funcsend(alias):
         i = getDirec(cardinal)
         data = {alias:i}
         if i != (0,0):
-            producer.send('mapa', value=data)
+            producer.send('movement', value=data)
         i = (0,0)
         direc = ""
         cardinal = ""
@@ -310,6 +312,7 @@ def login():
     usr, passwd = checkUserData(username, password)
     if usr != "" and passwd != "":
         client = MySocket("TCP", ADDR_E)
+        client.send_msg("Player")
         client.send_obj((usr,passwd))
         msg = client.recv_msg()
         printMsg(msg)
