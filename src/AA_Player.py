@@ -36,7 +36,7 @@ def clear_console():
 
 def printLeaderBoard(mapa):
     print("***********************************")
-    print("*       TABLA DE CAMPEONES        *")
+    print("*       TABLA DE JUGADORES        *")
     print("***********************************")
 
     players = sorted_players = []
@@ -57,7 +57,7 @@ def printLeaderBoard(mapa):
                 players.append((alias,level))
 
     sorted_players = list(sorted(players, key=lambda x: x[1]))
-
+    ''' #RANKING EXPERIMENT
     for (x,y) in sorted_players:
         i+=1
         if i == 1:
@@ -65,6 +65,14 @@ def printLeaderBoard(mapa):
         else:
             color = bcolors.WHITE
         print(color + str(i) + " - " + x + ": nivel " + y + bcolors.END)
+    '''
+    for (x,y) in sorted_players:
+        i+=1
+        if i % 2 == 0:
+            color = bcolors.YELLOW
+        else:
+            color = bcolors.WHITE
+        print(color + x + ": nivel " + y + bcolors.END)
 
     print("***********************************")
 
@@ -134,7 +142,7 @@ def getDirec(cardinal):
 
 def funcsend(alias):
     producer = KafkaProducer(
-        bootstrap_servers = ["localhost:29092"],
+        bootstrap_servers = ADDR_K,
         value_serializer = lambda v: pickle.dumps(v)
     )
     i = (0,0)
@@ -152,6 +160,14 @@ def funcsend(alias):
             cardinal = "S"
         elif direc.upper() == "D":
             cardinal = "E"
+        elif direc.upper() == "Q":
+            cardinal = "NW"
+        elif direc.upper() == "C":
+            cardinal = "SE"
+        elif direc.upper() == "E":
+            cardinal = "NE"
+        elif direc.upper() == "X":
+            cardinal = "SW"
         i = getDirec(cardinal)
         data = {alias:i}
         if i != (0,0):
@@ -160,13 +176,13 @@ def funcsend(alias):
         direc = ""
         cardinal = ""
 
-def funcrecv(ini_map):
+def funcrecv(ini_map, alias):
     consumer = KafkaConsumer(
      "map",
-     bootstrap_servers=['localhost:29092'],
+     bootstrap_servers=ADDR_K,
      auto_offset_reset='earliest',
      enable_auto_commit=True,
-     group_id="ax",
+     group_id=alias,
      value_deserializer = lambda v: pickle.loads(v)
     )
 
@@ -176,14 +192,13 @@ def funcrecv(ini_map):
         printMap(mapa)
 
 def startMatch(alias, mapa):
-    Thread(target=funcrecv, args=(mapa,), daemon=True).start()
+    Thread(target=funcrecv, args=(mapa,alias,), daemon=True).start()
     t2 = Thread(target=funcsend, args=(alias,), daemon=True)
     t2.start()
     t2.join()
-    print("he salido de la pista")
-    time.sleep(10000)
+    time.sleep(1)
 
-def getReady():
+def getReady(alias):
     mapa = None
 
     clear_console()
@@ -191,10 +206,10 @@ def getReady():
 
     consumer = KafkaConsumer(
      "map",
-     bootstrap_servers=['localhost:29092'],
+     bootstrap_servers=ADDR_K,
      auto_offset_reset='earliest',
      enable_auto_commit=True,
-     group_id="al",
+     group_id=alias,
      consumer_timeout_ms= 60 * 30 * 1000,
      value_deserializer = lambda v: pickle.loads(v)
     )
@@ -317,11 +332,10 @@ def login():
         msg = client.recv_msg()
         printMsg(msg)
         if msg[0:5] != "Error":
-            login = True
             while ready != "":
                 ready = input("Presiona ENTER cuando esté todo listo: ")
             client.send_msg("Ready")
-            mapa = getReady()
+            mapa = getReady(usr)
             startMatch(usr, mapa)
 
 def optionError():
