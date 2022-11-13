@@ -87,7 +87,8 @@ class HumanPlayer(Player):
 
 class NPC(Player):
     def __init__(self):
-        super().__init__(level=random.randint(0,25))
+        self.alias = "@NPC"
+        super().__init__(level=random.randint(10,25))
 
     def __str__(self):
         return "NPC con nivel " + str(self.getTotalLevel())
@@ -280,9 +281,9 @@ class Game():
             self.fight(player)
 
     def fight(self, player1):
-        for player2 in self.players.values():
+        for player2 in list(self.players.values()):
             if player2.pos == player1.pos and player1.getTotalLevel() != player2.getTotalLevel():
-                playertodel = max(player1, player2, key=lambda player: player.getTotalLevel())
+                playertodel = min(player1, player2, key=lambda player: player.getTotalLevel())
                 self.map.delValueCell(playertodel.pos, playertodel.alias)
                 self.players.pop(playertodel.alias)
                 playertodel.die()
@@ -310,7 +311,7 @@ class ConnHumanPlayer(HumanPlayer):
 class ConnNPC(NPC):
     def __init__(self, conn):
         self.conn = conn
-        self.ready = False
+        self.ready = True
         super().__init__()
 
 def print_count(text, textargs, nreverselines):
@@ -362,12 +363,13 @@ def handle_player_join(conn, addr, server, players):
     users_ready = {p for p in players if p.ready}
     print_count(PRINT_USERS_READY, (len(users_ready), len(players)), 0)
 
-    server.recv_msg()   #Ready
-    player.ready = True
+    if not isinstance(player, NPC):
+        server.recv_msg()   #Ready
+        player.ready = True
     users_ready = {p for p in players if p.ready}
     print_count(PRINT_USERS_READY, (len(users_ready), len(players)), 0)
 
-    if len(users_ready) == len(players) >= 2:
+    if len(users_ready) == len(players) == MAX_PLAYERS:
         server.close()
 
 #==================================================
