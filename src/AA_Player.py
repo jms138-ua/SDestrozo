@@ -36,7 +36,7 @@ def clear_console():
 
 def printLeaderBoard(mapa):
     print("***********************************")
-    print("*       TABLA DE JUGADORES        *")
+    print("*       TABLA DE CAMPEONES        *")
     print("***********************************")
 
     players = sorted_players = []
@@ -56,8 +56,8 @@ def printLeaderBoard(mapa):
 
                 players.append((alias,level))
 
-    sorted_players = list(sorted(players, key=lambda x: x[1]))
-    ''' #RANKING EXPERIMENT
+    sorted_players = list(sorted(players, key=lambda x: x[1], reverse=True))
+
     for (x,y) in sorted_players:
         i+=1
         if i == 1:
@@ -65,14 +65,6 @@ def printLeaderBoard(mapa):
         else:
             color = bcolors.WHITE
         print(color + str(i) + " - " + x + ": nivel " + y + bcolors.END)
-    '''
-    for (x,y) in sorted_players:
-        i+=1
-        if i % 2 == 0:
-            color = bcolors.YELLOW
-        else:
-            color = bcolors.WHITE
-        print(color + x + ": nivel " + y + bcolors.END)
 
     print("***********************************")
 
@@ -151,7 +143,6 @@ def funcsend(alias):
     alive = True
     while alive:
         direc = input()
-        clear_console()
         if direc.upper() == "W":
             cardinal = "N"
         elif direc.upper() == "A":
